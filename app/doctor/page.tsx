@@ -35,9 +35,22 @@ export default function DoctorPortalPage() {
               </div>
               <Switch checked={available} onCheckedChange={setAvailable} />
             </div>
-            <div className="flex justify-end">
-              <Button onClick={() => router.push('/doctor/queue')}>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => router.push('/doctor/queue')}
+              >
                 Go to queue
+              </Button>
+              <Button
+                onClick={async () => {
+                  try {
+                    await authClient.signOut();
+                  } catch {}
+                  router.replace('/doctor/login');
+                }}
+              >
+                Logout
               </Button>
             </div>
           </div>

@@ -35,4 +35,28 @@ export default defineSchema({
     sender: v.string(),
     text: v.string(),
   }).index('by_sessionId', ['sessionId']),
+  users: defineTable({
+    role: v.union(v.literal('patient'), v.literal('doctor')),
+    name: v.string(),
+    language: v.optional(v.string()),
+    contact: v.optional(v.string()),
+  }).index('by_role', ['role']),
+  doctors: defineTable({
+    code: v.string(),
+    name: v.string(),
+    languages: v.array(v.string()),
+    active: v.boolean(),
+  }).index('by_active', ['active']),
+  summaries: defineTable({
+    sessionId: v.string(),
+    text: v.string(),
+    model: v.optional(v.string()),
+    lang: v.optional(v.string()),
+  }).index('by_sessionId', ['sessionId']),
+  consents: defineTable({
+    sessionId: v.string(),
+    scope: v.string(),
+    granted: v.boolean(),
+    timestamp: v.number(),
+  }).index('by_sessionId', ['sessionId']),
 });
