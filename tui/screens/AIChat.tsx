@@ -1,6 +1,6 @@
 import { TextAttributes } from '@opentui/core';
 import { useKeyboard } from '@opentui/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ChatMessage } from '../types';
 
 interface Props {
@@ -11,6 +11,30 @@ interface Props {
 
 export function AIChat({ messages, onSend, onFinish }: Props) {
   const [input, setInput] = useState('');
+  const [scrollOffset, setScrollOffset] = useState(0);
+
+  function getLayoutMetrics() {
+    const termCols =
+      typeof process !== 'undefined' &&
+      (process as any).stdout &&
+      (process as any).stdout.columns
+        ? ((process as any).stdout.columns as number)
+        : 80;
+    const termRows =
+      typeof process !== 'undefined' &&
+      (process as any).stdout &&
+      (process as any).stdout.rows
+        ? ((process as any).stdout.rows as number)
+        : 24;
+
+    const overheadRows = 15;
+    const chatBoxTotalHeight = Math.max(8, termRows - overheadRows);
+
+    const maxContentLines = Math.max(1, chatBoxTotalHeight - 4);
+
+    const innerWidth = Math.max(10, termCols - 8);
+    return { innerWidth, maxContentLines, chatBoxTotalHeight };
+  }
 
   function wrapTextWithPrefix(
     text: string,
@@ -49,7 +73,6 @@ export function AIChat({ messages, onSend, onFinish }: Props) {
         if (candidate.length <= safeWidth) {
           current = candidate;
         } else {
-          // If single word too long, split it into chunks
           if (
             word.length >
             safeWidth - (isFirst ? prefix.length : indent.length)
@@ -92,6 +115,31 @@ export function AIChat({ messages, onSend, onFinish }: Props) {
   }
 
   useKeyboard((key) => {
+    if (key.name === 'up') {
+      setScrollOffset((o) => o + 1);
+      return;
+    }
+    if (key.name === 'down') {
+      setScrollOffset((o) => Math.max(0, o - 1));
+      return;
+    }
+    if (key.name === 'pageup') {
+      setScrollOffset((o) => o + 10);
+      return;
+    }
+    if (key.name === 'pagedown') {
+      setScrollOffset((o) => Math.max(0, o - 10));
+      return;
+    }
+    if (key.name === 'home') {
+      setScrollOffset(Number.MAX_SAFE_INTEGER);
+      return;
+    }
+    if (key.name === 'end') {
+      setScrollOffset(0);
+      return;
+    }
+
     if (key.sequence === '9') {
       onFinish();
       return;
@@ -106,6 +154,7 @@ export function AIChat({ messages, onSend, onFinish }: Props) {
       const text = input.trim();
       if (text) onSend(text);
       setInput('');
+      setScrollOffset(0);
       return;
     }
 
@@ -127,53 +176,91 @@ export function AIChat({ messages, onSend, onFinish }: Props) {
     setInput((v) => v + seq);
   });
 
+  useEffect(() => {
+    const { maxContentLines } = getLayoutMetrics();
+    const allLines: Array<string> = [];
+    const { innerWidth } = getLayoutMetrics();
+    for (const m of messages) {
+      const prefix =
+        m.role === 'user' ? '> ' : m.role === 'assistant' ? 'AI: ' : '';
+      const wrapped = wrapTextWithPrefix(m.content, innerWidth, prefix);
+      for (const line of wrapped.split('\n')) allLines.push(line);
+    }
+    const maxOffset = Math.max(0, allLines.length - maxContentLines);
+    setScrollOffset((o) => Math.min(o, maxOffset));
+  }, [messages]);
+
   return (
-    <box flexDirection="column" padding={2} gap={1}>
+    <box flexDirection="column" flexGrow={1} padding={1} gap={1}>
       <text attributes={TextAttributes.BOLD}>AI Consultation</text>
-      <box border padding={1} height={12}>
-        {messages.length === 0 ? (
-          <text attributes={TextAttributes.DIM}>No messages yet</text>
-        ) : (
-          <box>
-            {(() => {
-              const termCols =
-                typeof process !== 'undefined' &&
-                (process as any).stdout &&
-                (process as any).stdout.columns
-                  ? ((process as any).stdout.columns as number)
-                  : 80;
-              const innerWidth = Math.max(10, termCols - 8);
-              const CHAT_HEIGHT = 12;
-              const maxContentLines = Math.max(1, CHAT_HEIGHT - 4);
+      {(() => {
+        const { chatBoxTotalHeight } = getLayoutMetrics();
+        return (
+          <box border padding={1} height={chatBoxTotalHeight}>
+            {messages.length === 0 ? (
+              <text attributes={TextAttributes.DIM}>No messages yet</text>
+            ) : (
+              <box>
+                {(() => {
+                  const { innerWidth, maxContentLines } = getLayoutMetrics();
 
-              const allLines: Array<string> = [];
-              for (const m of messages) {
-                const prefix =
-                  m.role === 'user'
-                    ? '> '
-                    : m.role === 'assistant'
-                      ? 'AI: '
-                      : '';
-                const wrapped = wrapTextWithPrefix(
-                  m.content,
-                  innerWidth,
-                  prefix,
-                );
-                for (const line of wrapped.split('\n')) allLines.push(line);
-              }
+                  const allLines: Array<string> = [];
+                  for (const m of messages) {
+                    const prefix =
+                      m.role === 'user'
+                        ? '> '
+                        : m.role === 'assistant'
+                          ? 'AI: '
+                          : '';
+                    const wrapped = wrapTextWithPrefix(
+                      m.content,
+                      innerWidth,
+                      prefix,
+                    );
+                    for (const line of wrapped.split('\n')) allLines.push(line);
+                  }
 
-              const visible = allLines.slice(-maxContentLines);
-              const text = visible.join('\n');
-              return <text>{text}</text>;
-            })()}
+                  const maxOffset = Math.max(
+                    0,
+                    allLines.length - maxContentLines,
+                  );
+                  const clampedOffset = Math.min(scrollOffset, maxOffset);
+                  const start = Math.max(
+                    0,
+                    allLines.length - maxContentLines - clampedOffset,
+                  );
+                  const end = Math.min(
+                    allLines.length,
+                    start + maxContentLines,
+                  );
+                  const visible = allLines.slice(start, end);
+                  const text = visible.join('\n');
+                  return <text>{text}</text>;
+                })()}
+              </box>
+            )}
           </box>
-        )}
-      </box>
+        );
+      })()}
       <box border padding={1}>
-        <text>Input: {input}</text>
+        {(() => {
+          const { innerWidth } = getLayoutMetrics();
+          const prefix = 'Input: ';
+          const maxLen = Math.max(1, innerWidth - prefix.length);
+          let shown = input;
+          if (shown.length > maxLen) {
+            shown = `…${shown.slice(-(maxLen - 1))}`;
+          }
+          return (
+            <text>
+              {prefix}
+              {shown}
+            </text>
+          );
+        })()}
       </box>
       <text attributes={TextAttributes.DIM}>
-        0 Back · Enter Send · 9 Finish
+        0 Back · Enter Send · 9 Finish · ↑/↓ Scroll · PgUp/PgDn · Home/End
       </text>
     </box>
   );
