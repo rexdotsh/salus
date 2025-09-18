@@ -2,7 +2,14 @@
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "files": {
     "ignoreUnknown": false,
-    "ignore": ["**/bun.lock", "node_modules", ".next", ".vercel", "public"]
+    "ignore": [
+      "**/bun.lock",
+      "node_modules",
+      ".next",
+      ".vercel",
+      "public",
+      "convex/_generated/**"
+    ]
   },
   "vcs": {
     "enabled": true,
