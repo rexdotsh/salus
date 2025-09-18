@@ -64,6 +64,7 @@ export class PeerJsEngine implements CallEngine {
       incoming.answer(this.local);
       incoming.on('stream', (remote) => this.events.onRemoteStream?.(remote));
       this.pc = (incoming as any)?.peerConnection ?? this.pc;
+      this.call = incoming;
     });
 
     return this.local;
@@ -72,10 +73,37 @@ export class PeerJsEngine implements CallEngine {
   async toggleVideo(enable?: boolean): Promise<void> {
     if (!this.local) return;
     const hasVideo = this.local.getVideoTracks().length > 0;
+    const pc: RTCPeerConnection | null =
+      (this.call as any)?.peerConnection ?? this.pc ?? null;
+
+    // Disable video
     if (enable === false || (enable == null && hasVideo)) {
-      for (const t of this.local.getVideoTracks()) t.stop();
+      const currentVideoTracks = this.local.getVideoTracks();
+      try {
+        if (pc) {
+          const videoSenders = pc
+            .getSenders()
+            .filter((s) => s.track?.kind === 'video');
+          for (const s of videoSenders) {
+            try {
+              pc.removeTrack(s);
+            } catch {}
+          }
+        }
+      } catch {}
+      for (const t of currentVideoTracks) {
+        try {
+          t.stop();
+        } catch {}
+        try {
+          this.local.removeTrack(t);
+        } catch {}
+      }
+      await this.restartMediaCall();
       return;
     }
+
+    // Enable video
     const cam = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 426, max: 640 },
@@ -84,13 +112,42 @@ export class PeerJsEngine implements CallEngine {
       },
       audio: false,
     });
-    const sender = this.call?.peerConnection
-      .getSenders()
-      .find((s) => s.track?.kind === 'video');
-    if (sender && cam.getVideoTracks()[0]) {
-      await sender.replaceTrack(cam.getVideoTracks()[0]);
+    const camTrack = cam.getVideoTracks()[0];
+    if (!camTrack) return;
+
+    // Update local stream
+    try {
+      this.local.addTrack(camTrack);
+    } catch {}
+
+    // Attach to RTCPeerConnection
+    try {
+      if (pc) {
+        const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+        if (sender) {
+          await sender.replaceTrack(camTrack);
+        } else {
+          pc.addTrack(camTrack, this.local);
+        }
+      }
+    } catch {}
+    await this.restartMediaCall();
+  }
+
+  private async restartMediaCall(): Promise<void> {
+    if (!this.peer || !this.local) return;
+    try {
+      this.call?.close();
+    } catch {}
+    try {
+      const newCall = this.peer.call(this.otherId, this.local);
+      this.call = newCall;
+      newCall.on('stream', (remote) => this.events.onRemoteStream?.(remote));
+      newCall.on('error', (e) => this.events.onError?.(e.message));
+      this.pc = (newCall as any)?.peerConnection ?? this.pc;
+    } catch (e: any) {
+      this.events.onError?.(e?.message ?? 'Failed to restart call');
     }
-    this.local.addTrack(cam.getVideoTracks()[0]);
   }
 
   setMuted(muted: boolean): void {
