@@ -12,6 +12,7 @@ import { PeerJsEngine } from '@/lib/call/PeerJsEngine';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { NotesPanel } from '@/components/NotesPanel';
+import { MicActivity } from '@/components/MicActivity';
 
 type Role = 'patient' | 'doctor';
 
@@ -99,9 +100,8 @@ export default function SessionPage() {
   }, [sessionId]);
 
   function toggleMute() {
-    const stream = (localVideoRef.current?.srcObject as MediaStream) || null;
-    if (!stream) return;
-    for (const t of stream.getAudioTracks()) t.enabled = muted;
+    // Route through engine to ensure underlying stream state updates consistently
+    engineRef.current?.setMuted(!muted);
     setMuted((m) => !m);
   }
 
@@ -164,6 +164,9 @@ export default function SessionPage() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <div className="mr-2 rounded-full border px-2 py-1 text-xs uppercase tracking-wide text-muted-foreground">
+                {getRole() === 'doctor' ? 'Doctor' : 'Patient'}
+              </div>
               <Button
                 onClick={toggleMute}
                 variant={muted ? 'secondary' : 'default'}
@@ -195,6 +198,12 @@ export default function SessionPage() {
               <Button onClick={() => router.refresh()} variant="secondary">
                 Reconnect
               </Button>
+              <MicActivity
+                className="ml-auto"
+                stream={
+                  (localVideoRef.current?.srcObject as MediaStream) || null
+                }
+              />
             </div>
             {error && <div className="text-sm text-destructive">{error}</div>}
             {connecting && (
@@ -238,7 +247,7 @@ export default function SessionPage() {
               />
             </CardContent>
           </Card>
-          <NotesPanel sessionId={sessionId} />
+          <NotesPanel sessionId={sessionId} readOnly={getRole() !== 'doctor'} />
         </div>
       </div>
       <TuiFallbackDialog

@@ -9,9 +9,10 @@ import { api } from '@/convex/_generated/api';
 
 type Props = {
   sessionId: string;
+  readOnly?: boolean;
 };
 
-export function NotesPanel({ sessionId }: Props) {
+export function NotesPanel({ sessionId, readOnly = false }: Props) {
   const storageKey = `salus:session:${sessionId}:notes`;
   const [notes, setNotes] = useState('');
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -30,6 +31,7 @@ export function NotesPanel({ sessionId }: Props) {
   }, [serverNotes, notes]);
 
   async function save() {
+    if (readOnly) return;
     localStorage.setItem(storageKey, notes);
     await saveNotes({ sessionId, body: notes });
     setSavedAt(Date.now());
@@ -46,16 +48,21 @@ export function NotesPanel({ sessionId }: Props) {
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           className="min-h-40"
+          readOnly={readOnly}
         />
         <div className="flex items-center justify-between">
           <div className="text-xs text-muted-foreground">
-            {savedAt
-              ? `Saved ${new Date(savedAt).toLocaleTimeString()}`
-              : 'Not saved'}
+            {readOnly
+              ? 'View only'
+              : savedAt
+                ? `Saved ${new Date(savedAt).toLocaleTimeString()}`
+                : 'Not saved'}
           </div>
-          <Button onClick={save} variant="secondary">
-            Save
-          </Button>
+          {!readOnly && (
+            <Button onClick={save} variant="secondary">
+              Save
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
