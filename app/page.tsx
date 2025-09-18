@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -7,11 +8,14 @@ export default function HomePage() {
     <main className="min-h-dvh bg-background text-foreground">
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <Link href="/" className="inline-flex items-baseline gap-2">
-            <span className="text-lg font-semibold">Salus</span>
-            <span className="text-xs text-muted-foreground">
-              Telemedicine for low bandwidth
-            </span>
+          <Link href="/" className="inline-flex items-center gap-2">
+            <Image
+              src="/salus.png"
+              alt=""
+              width={120}
+              height={40}
+              className="h-10 w-auto"
+            />
           </Link>
           <Button asChild variant="secondary">
             <Link href="/doctor">Doctor portal</Link>
