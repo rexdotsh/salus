@@ -44,3 +44,4 @@ tui/repomix.xml
 
 *.md
 .cursorignore
+package-lock.json
