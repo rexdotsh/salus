@@ -63,8 +63,9 @@ export function useAppRouter() {
     setState((s) => ({
       ...s,
       stack: [...s.stack, s.screen],
-      screen: 'EMERGENCY',
-      triage: { ...s.triage, urgency: 'Emergency' },
+      screen: 'QUEUE',
+      queuePosition: 0,
+      triage: { ...s.triage, urgency: 'Emergency', risk: 'Emergency' },
     }));
   }, []);
 
@@ -130,7 +131,34 @@ export function useAppRouter() {
           return;
         }
 
+        const a = state.triage.answers;
+        const contextParts = [
+          a.mainSymptom ? `Main: ${a.mainSymptom}` : undefined,
+          a.otherDetails ? `Other: ${a.otherDetails}` : undefined,
+          a.duration ? `Duration: ${a.duration}` : undefined,
+          a.onset ? `Onset: ${a.onset}` : undefined,
+          a.severity ? `Severity: ${a.severity}` : undefined,
+          a.fever !== undefined
+            ? `Fever: ${a.fever ? 'yes' : 'no'}`
+            : undefined,
+          a.ageGroup ? `Age: ${a.ageGroup}` : undefined,
+          a.pregnant !== undefined
+            ? `Pregnant: ${a.pregnant ? 'yes' : 'no'}`
+            : undefined,
+          a.redFlagChestPain ? 'RF: chest pain' : undefined,
+          a.redFlagBreathing ? 'RF: severe SOB' : undefined,
+          a.redFlagUnconscious ? 'RF: unconscious/confusion' : undefined,
+          a.redFlagBleeding ? 'RF: bleeding' : undefined,
+        ]
+          .filter(Boolean)
+          .join(' | ');
+
+        const systemContext = contextParts
+          ? [{ role: 'system' as const, content: `Triage: ${contextParts}` }]
+          : [];
+
         const sourceMessages = [
+          ...systemContext,
           ...state.chat.messages,
           { role: 'user' as const, content: text },
         ];
@@ -176,7 +204,7 @@ export function useAppRouter() {
         }
       });
     },
-    [state.chat.messages],
+    [state.chat.messages, state.triage.answers],
   );
 
   const generateSummary = useCallback(() => {
