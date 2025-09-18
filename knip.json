@@ -1,4 +1,4 @@
 {
-  "ignore": ["components/ui/**"],
+  "ignore": ["components/ui/**", "tui/**"],
   "ignoreDependencies": ["tailwindcss", "tw-animate-css", "postcss"]
 }
