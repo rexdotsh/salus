@@ -6,6 +6,11 @@ import {
   getDoctorAvailability,
 } from './services/status';
 import { loadSession, saveSession } from './services/storage';
+import {
+  generateAiReply,
+  generateAiReplyStream,
+  isAiConfigured,
+} from './services/ai';
 import { assessRisk } from './utils/risk';
 
 const initialState: AppState = {
@@ -89,18 +94,90 @@ export function useAppRouter() {
     setState((s) => ({ ...s, triage: { ...s.triage, stepIndex: next } }));
   }, []);
 
-  const sendMessage = useCallback((text: string) => {
-    setState((s) => ({
-      ...s,
-      chat: {
-        messages: [
-          ...s.chat.messages,
-          { role: 'user', content: text },
-          { role: 'assistant', content: '(AI reply stub)' },
-        ],
-      },
-    }));
-  }, []);
+  const sendMessage = useCallback(
+    (text: string) => {
+      let assistantIndex = -1;
+
+      setState((s) => {
+        const baseLen = s.chat.messages.length;
+        assistantIndex = baseLen + 1;
+        return {
+          ...s,
+          chat: {
+            ...s.chat,
+            messages: [
+              ...s.chat.messages,
+              { role: 'user' as const, content: text },
+              { role: 'assistant' as const, content: '...' },
+            ],
+          },
+        };
+      });
+
+      setTimeout(async () => {
+        const useAi = isAiConfigured();
+        if (!useAi) {
+          setState((s) => {
+            const msgs = s.chat.messages.slice();
+            if (assistantIndex >= 0 && assistantIndex < msgs.length) {
+              msgs[assistantIndex] = {
+                role: 'assistant',
+                content: 'AI not configured. Set OPENROUTER_API_KEY.',
+              };
+            }
+            return { ...s, chat: { ...s.chat, messages: msgs } };
+          });
+          return;
+        }
+
+        const sourceMessages = [
+          ...state.chat.messages,
+          { role: 'user' as const, content: text },
+        ];
+        let accumulated = '';
+
+        try {
+          await generateAiReplyStream(sourceMessages, {
+            onToken: (delta) =>
+              setState((s) => {
+                accumulated += delta;
+                const msgs = s.chat.messages.slice();
+                if (assistantIndex >= 0 && assistantIndex < msgs.length) {
+                  msgs[assistantIndex] = {
+                    role: 'assistant',
+                    content: accumulated,
+                  };
+                }
+                return { ...s, chat: { ...s.chat, messages: msgs } };
+              }),
+          });
+
+          if (!accumulated) {
+            const reply = await generateAiReply(sourceMessages);
+            setState((s) => {
+              const msgs = s.chat.messages.slice();
+              if (assistantIndex >= 0 && assistantIndex < msgs.length) {
+                msgs[assistantIndex] = { role: 'assistant', content: reply };
+              }
+              return { ...s, chat: { ...s.chat, messages: msgs } };
+            });
+          }
+        } catch {
+          setState((s) => {
+            const msgs = s.chat.messages.slice();
+            if (assistantIndex >= 0 && assistantIndex < msgs.length) {
+              msgs[assistantIndex] = {
+                role: 'assistant',
+                content: 'AI request failed.',
+              };
+            }
+            return { ...s, chat: { ...s.chat, messages: msgs } };
+          });
+        }
+      });
+    },
+    [state.chat.messages],
+  );
 
   const generateSummary = useCallback(() => {
     setState((s) => {
