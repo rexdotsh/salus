@@ -6,6 +6,11 @@ import {
   getDoctorAvailability,
 } from './services/status';
 import { loadSession, saveSession } from './services/storage';
+import {
+  generateAiReply,
+  generateAiReplyStream,
+  isAiConfigured,
+} from './services/ai';
 import { assessRisk } from './utils/risk';
 
 const initialState: AppState = {
@@ -58,8 +63,9 @@ export function useAppRouter() {
     setState((s) => ({
       ...s,
       stack: [...s.stack, s.screen],
-      screen: 'EMERGENCY',
-      triage: { ...s.triage, urgency: 'Emergency' },
+      screen: 'QUEUE',
+      queuePosition: 0,
+      triage: { ...s.triage, urgency: 'Emergency', risk: 'Emergency' },
     }));
   }, []);
 
@@ -89,18 +95,117 @@ export function useAppRouter() {
     setState((s) => ({ ...s, triage: { ...s.triage, stepIndex: next } }));
   }, []);
 
-  const sendMessage = useCallback((text: string) => {
-    setState((s) => ({
-      ...s,
-      chat: {
-        messages: [
-          ...s.chat.messages,
-          { role: 'user', content: text },
-          { role: 'assistant', content: '(AI reply stub)' },
-        ],
-      },
-    }));
-  }, []);
+  const sendMessage = useCallback(
+    (text: string) => {
+      let assistantIndex = -1;
+
+      setState((s) => {
+        const baseLen = s.chat.messages.length;
+        assistantIndex = baseLen + 1;
+        return {
+          ...s,
+          chat: {
+            ...s.chat,
+            messages: [
+              ...s.chat.messages,
+              { role: 'user' as const, content: text },
+              { role: 'assistant' as const, content: '...' },
+            ],
+          },
+        };
+      });
+
+      setTimeout(async () => {
+        const useAi = isAiConfigured();
+        if (!useAi) {
+          setState((s) => {
+            const msgs = s.chat.messages.slice();
+            if (assistantIndex >= 0 && assistantIndex < msgs.length) {
+              msgs[assistantIndex] = {
+                role: 'assistant',
+                content: 'AI not configured. Set OPENROUTER_API_KEY.',
+              };
+            }
+            return { ...s, chat: { ...s.chat, messages: msgs } };
+          });
+          return;
+        }
+
+        const a = state.triage.answers;
+        const contextParts = [
+          a.mainSymptom ? `Main: ${a.mainSymptom}` : undefined,
+          a.otherDetails ? `Other: ${a.otherDetails}` : undefined,
+          a.duration ? `Duration: ${a.duration}` : undefined,
+          a.onset ? `Onset: ${a.onset}` : undefined,
+          a.severity ? `Severity: ${a.severity}` : undefined,
+          a.fever !== undefined
+            ? `Fever: ${a.fever ? 'yes' : 'no'}`
+            : undefined,
+          a.ageGroup ? `Age: ${a.ageGroup}` : undefined,
+          a.pregnant !== undefined
+            ? `Pregnant: ${a.pregnant ? 'yes' : 'no'}`
+            : undefined,
+          a.redFlagChestPain ? 'RF: chest pain' : undefined,
+          a.redFlagBreathing ? 'RF: severe SOB' : undefined,
+          a.redFlagUnconscious ? 'RF: unconscious/confusion' : undefined,
+          a.redFlagBleeding ? 'RF: bleeding' : undefined,
+        ]
+          .filter(Boolean)
+          .join(' | ');
+
+        const systemContext = contextParts
+          ? [{ role: 'system' as const, content: `Triage: ${contextParts}` }]
+          : [];
+
+        const sourceMessages = [
+          ...systemContext,
+          ...state.chat.messages,
+          { role: 'user' as const, content: text },
+        ];
+        let accumulated = '';
+
+        try {
+          await generateAiReplyStream(sourceMessages, {
+            onToken: (delta) =>
+              setState((s) => {
+                accumulated += delta;
+                const msgs = s.chat.messages.slice();
+                if (assistantIndex >= 0 && assistantIndex < msgs.length) {
+                  msgs[assistantIndex] = {
+                    role: 'assistant',
+                    content: accumulated,
+                  };
+                }
+                return { ...s, chat: { ...s.chat, messages: msgs } };
+              }),
+          });
+
+          if (!accumulated) {
+            const reply = await generateAiReply(sourceMessages);
+            setState((s) => {
+              const msgs = s.chat.messages.slice();
+              if (assistantIndex >= 0 && assistantIndex < msgs.length) {
+                msgs[assistantIndex] = { role: 'assistant', content: reply };
+              }
+              return { ...s, chat: { ...s.chat, messages: msgs } };
+            });
+          }
+        } catch {
+          setState((s) => {
+            const msgs = s.chat.messages.slice();
+            if (assistantIndex >= 0 && assistantIndex < msgs.length) {
+              msgs[assistantIndex] = {
+                role: 'assistant',
+                content: 'AI request failed.',
+              };
+            }
+            return { ...s, chat: { ...s.chat, messages: msgs } };
+          });
+        }
+      });
+    },
+    [state.chat.messages, state.triage.answers],
+  );
 
   const generateSummary = useCallback(() => {
     setState((s) => {

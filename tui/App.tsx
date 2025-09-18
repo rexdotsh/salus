@@ -1,6 +1,4 @@
-import { TextAttributes } from '@opentui/core';
 import { useKeyboard } from '@opentui/react';
-import { StatusBar } from './components/StatusBar';
 import { useAppRouter } from './router';
 import { Emergency } from './screens/Emergency';
 import { AIChat } from './screens/AIChat';
@@ -8,7 +6,7 @@ import { PreTriage } from './screens/PreTriage';
 import { Prescription } from './screens/Prescription';
 import { Queue } from './screens/Queue';
 import { Summary } from './screens/Summary';
-import { Symptoms } from './screens/Symptoms';
+import { Symptoms, SYMPTOMS_TOTAL_STEPS } from './screens/Symptoms';
 import { Urgency } from './screens/Urgency';
 import { Welcome } from './screens/Welcome';
 
@@ -18,7 +16,7 @@ export function App() {
 
   useKeyboard((key) => {
     if (state.screen === 'WELCOME') {
-      if (key.sequence === '1') router.push('URGENCY');
+      if (key.sequence === '1') router.push('SYMPTOMS');
     } else if (state.screen === 'URGENCY') {
       if (key.sequence === '1')
         router.setUrgency('Emergency'),
@@ -39,8 +37,6 @@ export function App() {
     } else if (state.screen === 'QUEUE') {
       if (key.sequence === '1') router.replace('AI_CHAT');
     } else if (state.screen === 'AI_CHAT') {
-      if (key.sequence === '1') onSendPreset('My pain is 3/5');
-      if (key.sequence === '2') onSendPreset('Any medicine?');
       if (key.sequence === '9') router.push('PRESCRIPTION');
     } else if (state.screen === 'PRESCRIPTION') {
       if (key.sequence === '1')
@@ -50,28 +46,23 @@ export function App() {
 
   function onSymptomsNext() {
     const nextStep = state.triage.stepIndex + 1;
-    if (nextStep >= 5) {
+    if (nextStep >= SYMPTOMS_TOTAL_STEPS) {
       router.replace('PRE_TRIAGE');
     } else {
       router.setTriageStepIndex(nextStep);
     }
   }
 
-  function onSendPreset(text: string) {
+  function onSend(text: string) {
     router.sendMessage(text);
   }
 
   return (
     <box flexDirection="column" flexGrow={1}>
-      <StatusBar
-        connection={state.connection}
-        doctor={state.doctor}
-        queuePosition={state.queuePosition}
-      />
       <box padding={1} flexGrow={1}>
         {state.screen === 'WELCOME' && (
           <Welcome
-            onStart={() => router.push('URGENCY')}
+            onStart={() => router.push('SYMPTOMS')}
             onEmergency={router.emergency}
           />
         )}
@@ -106,7 +97,7 @@ export function App() {
         {state.screen === 'AI_CHAT' && (
           <AIChat
             messages={state.chat.messages}
-            onSend={onSendPreset}
+            onSend={onSend}
             onFinish={() => router.push('PRESCRIPTION')}
           />
         )}
@@ -121,12 +112,9 @@ export function App() {
         {state.screen === 'SUMMARY' && state.summary && (
           <Summary summary={state.summary} />
         )}
-        {state.screen === 'EMERGENCY' && <Emergency />}
-      </box>
-      <box padding={1}>
-        <text attributes={TextAttributes.DIM}>
-          ASCII-only UI · Offline-friendly
-        </text>
+        {state.screen === 'EMERGENCY' && (
+          <Emergency onStartAI={() => router.push('AI_CHAT')} />
+        )}
       </box>
     </box>
   );

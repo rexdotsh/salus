@@ -18,10 +18,17 @@ export type RiskLevel = UrgencyLevel;
 
 export interface SymptomAnswers {
   mainSymptom?: string;
-  duration?: 'hours' | 'days' | 'weeks';
+  otherDetails?: string;
+  duration?: 'hours' | 'days' | 'weeks' | 'months';
+  onset?: 'sudden' | 'gradual';
   severity?: 1 | 2 | 3 | 4 | 5;
   fever?: boolean;
   ageGroup?: 'infant' | 'child' | 'adult' | 'elder';
+  pregnant?: boolean;
+  redFlagChestPain?: boolean;
+  redFlagBreathing?: boolean;
+  redFlagUnconscious?: boolean;
+  redFlagBleeding?: boolean;
 }
 
 export interface ChatMessage {
