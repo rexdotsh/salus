@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Salus',
   description:
-    'Salus | Submission for the BMS Hackpahsia Hackathon by Team Unreal.',
+    'Salus | Submission for the BMS Hackaphasia Hackathon by Team Unreal.',
 };
 
 export default function RootLayout({

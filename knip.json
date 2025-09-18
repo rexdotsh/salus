@@ -1,11 +1,4 @@
 {
-    "ignore": [
-        "components/ui/**"
-    ],
-    "ignoreDependencies": [
-        "lefthook",
-        "tailwindcss",
-        "tw-animate-css",
-        "postcss"
-    ]
+  "ignore": ["components/ui/**"],
+  "ignoreDependencies": ["tailwindcss", "tw-animate-css", "postcss"]
 }
