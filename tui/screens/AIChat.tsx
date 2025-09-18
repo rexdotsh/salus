@@ -12,6 +12,85 @@ interface Props {
 export function AIChat({ messages, onSend, onFinish }: Props) {
   const [input, setInput] = useState('');
 
+  function wrapTextWithPrefix(
+    text: string,
+    maxWidth: number,
+    prefix: string,
+  ): string {
+    const lines: Array<string> = [];
+    const indent = ' '.repeat(prefix.length);
+    const safeWidth = Math.max(10, maxWidth);
+
+    const splitWord = (word: string, firstLine: boolean) => {
+      const available = safeWidth - (firstLine ? prefix.length : indent.length);
+      if (available <= 0) return [word];
+      const chunks: Array<string> = [];
+      for (let i = 0; i < word.length; i += available) {
+        chunks.push(word.slice(i, i + available));
+      }
+      return chunks;
+    };
+
+    for (const para of text.split('\n')) {
+      let current = prefix;
+      let isFirst = true;
+      const words = para.split(/\s+/).filter((w) => w.length > 0);
+      if (words.length === 0) {
+        lines.push(current.trimEnd());
+        continue;
+      }
+      for (const word of words) {
+        const candidate =
+          (current.length > 0
+            ? current + (current.endsWith(' ') ? '' : ' ')
+            : isFirst
+              ? prefix
+              : indent) + word;
+        if (candidate.length <= safeWidth) {
+          current = candidate;
+        } else {
+          // If single word too long, split it into chunks
+          if (
+            word.length >
+            safeWidth - (isFirst ? prefix.length : indent.length)
+          ) {
+            const pieces = splitWord(word, isFirst);
+            for (let i = 0; i < pieces.length; i++) {
+              const piece = pieces[i];
+              const pre = isFirst ? prefix : indent;
+              const line =
+                current.trim().length > 0 && current !== pre
+                  ? current
+                  : pre + piece;
+              if (line.length <= safeWidth) {
+                if (current.trim().length > 0 && current !== pre) {
+                  lines.push(current.trimEnd());
+                  current = pre + piece;
+                } else {
+                  current = pre + piece;
+                }
+              } else {
+                lines.push((pre + piece).slice(0, safeWidth));
+                current = '';
+              }
+              if (i < pieces.length - 1) {
+                lines.push(current.trimEnd());
+                current = indent;
+                isFirst = false;
+              }
+            }
+          } else {
+            lines.push(current.trimEnd());
+            current = indent + word;
+          }
+        }
+        isFirst = false;
+      }
+      if (current.trim().length > 0) lines.push(current.trimEnd());
+    }
+    return lines.join('\n');
+  }
+
   useKeyboard((key) => {
     if (key.sequence === '9') {
       onFinish();
@@ -56,17 +135,37 @@ export function AIChat({ messages, onSend, onFinish }: Props) {
           <text attributes={TextAttributes.DIM}>No messages yet</text>
         ) : (
           <box>
-            {messages.map((m, i) => (
-              <text key={i}>
-                {m.role === 'user'
-                  ? '> '
-                  : m.role === 'assistant'
-                    ? 'AI: '
-                    : ''}
-                {m.content}
-                {'\n'}
-              </text>
-            ))}
+            {(() => {
+              const termCols =
+                typeof process !== 'undefined' &&
+                (process as any).stdout &&
+                (process as any).stdout.columns
+                  ? ((process as any).stdout.columns as number)
+                  : 80;
+              const innerWidth = Math.max(10, termCols - 8);
+              const CHAT_HEIGHT = 12;
+              const maxContentLines = Math.max(1, CHAT_HEIGHT - 4);
+
+              const allLines: Array<string> = [];
+              for (const m of messages) {
+                const prefix =
+                  m.role === 'user'
+                    ? '> '
+                    : m.role === 'assistant'
+                      ? 'AI: '
+                      : '';
+                const wrapped = wrapTextWithPrefix(
+                  m.content,
+                  innerWidth,
+                  prefix,
+                );
+                for (const line of wrapped.split('\n')) allLines.push(line);
+              }
+
+              const visible = allLines.slice(-maxContentLines);
+              const text = visible.join('\n');
+              return <text>{text}</text>;
+            })()}
           </box>
         )}
       </box>
