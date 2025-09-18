@@ -1,4 +1,6 @@
 import { TextAttributes } from '@opentui/core';
+import { useKeyboard } from '@opentui/react';
+import { useState } from 'react';
 import type { ChatMessage } from '../types';
 
 interface Props {
@@ -8,6 +10,44 @@ interface Props {
 }
 
 export function AIChat({ messages, onSend, onFinish }: Props) {
+  const [input, setInput] = useState('');
+
+  useKeyboard((key) => {
+    if (key.sequence === '9') {
+      onFinish();
+      return;
+    }
+
+    if (
+      key.name === 'return' ||
+      key.name === 'enter' ||
+      key.sequence === '\r' ||
+      key.sequence === '\n'
+    ) {
+      const text = input.trim();
+      if (text) onSend(text);
+      setInput('');
+      return;
+    }
+
+    if (
+      key.name === 'backspace' ||
+      key.sequence === '\x7f' ||
+      key.sequence === '\b'
+    ) {
+      setInput((v) => (v.length > 0 ? v.slice(0, -1) : v));
+      return;
+    }
+
+    const seq = key.sequence ?? '';
+
+    if (seq.length !== 1) return;
+    if (seq === '0') return;
+    if (!/[\x20-\x7E]/.test(seq)) return;
+
+    setInput((v) => v + seq);
+  });
+
   return (
     <box flexDirection="column" padding={2} gap={1}>
       <text attributes={TextAttributes.BOLD}>AI Consultation</text>
@@ -31,12 +71,10 @@ export function AIChat({ messages, onSend, onFinish }: Props) {
         )}
       </box>
       <box border padding={1}>
-        <text>
-          1 Say: "My pain is 3/5"{'\n'}2 Say: "Any medicine?"{'\n'}9 Finish
-        </text>
+        <text>Input: {input}</text>
       </box>
       <text attributes={TextAttributes.DIM}>
-        0 Back · 1-2 Send preset · 9 Finish
+        0 Back · Enter Send · 9 Finish
       </text>
     </box>
   );

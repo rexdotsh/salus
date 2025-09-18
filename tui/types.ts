@@ -10,7 +10,7 @@ export type ScreenKey =
   | 'QUEUE'
   | 'AI_CHAT'
   | 'PRESCRIPTION'
-  | 'SUMMARY'
+  | 'SUMARY'
   | 'EMERGENCY';
 
 export type UrgencyLevel = 'Emergency' | 'Urgent' | 'Routine';

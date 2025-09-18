@@ -39,8 +39,6 @@ export function App() {
     } else if (state.screen === 'QUEUE') {
       if (key.sequence === '1') router.replace('AI_CHAT');
     } else if (state.screen === 'AI_CHAT') {
-      if (key.sequence === '1') onSendPreset('My pain is 3/5');
-      if (key.sequence === '2') onSendPreset('Any medicine?');
       if (key.sequence === '9') router.push('PRESCRIPTION');
     } else if (state.screen === 'PRESCRIPTION') {
       if (key.sequence === '1')
@@ -57,7 +55,7 @@ export function App() {
     }
   }
 
-  function onSendPreset(text: string) {
+  function onSend(text: string) {
     router.sendMessage(text);
   }
 
@@ -106,7 +104,7 @@ export function App() {
         {state.screen === 'AI_CHAT' && (
           <AIChat
             messages={state.chat.messages}
-            onSend={onSendPreset}
+            onSend={onSend}
             onFinish={() => router.push('PRESCRIPTION')}
           />
         )}
@@ -121,7 +119,9 @@ export function App() {
         {state.screen === 'SUMMARY' && state.summary && (
           <Summary summary={state.summary} />
         )}
-        {state.screen === 'EMERGENCY' && <Emergency />}
+        {state.screen === 'EMERGENCY' && (
+          <Emergency onStartAI={() => router.push('AI_CHAT')} />
+        )}
       </box>
       <box padding={1}>
         <text attributes={TextAttributes.DIM}>
