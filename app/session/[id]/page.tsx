@@ -15,7 +15,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ConnectionBanner } from '@/components/ConnectionBanner';
 import { TuiFallbackDialog } from '@/components/TuiFallbackDialog';
 import { PeerJsEngine } from '@/lib/call/PeerJsEngine';
 import { useQuery, useMutation } from 'convex/react';
@@ -153,119 +152,129 @@ export default function SessionPage() {
 
   return (
     <TooltipProvider>
-      <main className="mx-auto max-w-7xl px-4 py-6 space-y-6">
-        <ConnectionBanner
-          sessionId={sessionId}
-          getStats={async () =>
-            pcRef.current ? await pcRef.current.getStats() : null
-          }
-          onForceAudioOnly={() => {
-            const stream =
-              (localVideoRef.current?.srcObject as MediaStream) || null;
-            if (!stream) return;
-            for (const t of stream.getVideoTracks()) t.stop();
-            setVideoOn(false);
-          }}
-        />
-
-        {/* Role and Status Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="px-3 py-1">
-              {getRole() === 'doctor' ? (
-                <>
-                  <Stethoscope className="w-4 h-4 mr-2" />
-                  Doctor
-                </>
-              ) : (
-                <>
-                  <UserCircle2 className="w-4 h-4 mr-2" />
-                  Patient
-                </>
+      <main className="h-screen flex flex-col overflow-hidden p-4 gap-4">
+        {/* Status Header */}
+        <Card className="shrink-0 p-0">
+          <CardContent className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="px-3 py-1">
+                {getRole() === 'doctor' ? (
+                  <>
+                    <Stethoscope className="w-4 h-4 mr-2" />
+                    Doctor
+                  </>
+                ) : (
+                  <>
+                    <UserCircle2 className="w-4 h-4 mr-2" />
+                    Patient
+                  </>
+                )}
+              </Badge>
+              {connecting && (
+                <Badge variant="secondary">
+                  <div className="w-2 h-2 bg-accent rounded-full animate-pulse mr-2" />
+                  Connecting...
+                </Badge>
               )}
-            </Badge>
-            {connecting && (
-              <Badge variant="secondary">
-                <div className="w-2 h-2 bg-accent rounded-full animate-pulse mr-2" />
-                Connecting...
-              </Badge>
-            )}
-            {!connecting && !error && (
-              <Badge variant="default">
-                <div className="w-2 h-2 bg-primary-foreground rounded-full mr-2" />
-                Connected
-              </Badge>
-            )}
-            {error && <Badge variant="destructive">Connection Error</Badge>}
-          </div>
-          <div className="flex items-center gap-2">
-            <MicActivity
-              stream={(localVideoRef.current?.srcObject as MediaStream) || null}
-            />
-          </div>
-        </div>
+              {!connecting && !error && (
+                <Badge variant="default">
+                  <div className="w-2 h-2 bg-primary-foreground rounded-full mr-2" />
+                  Connected
+                </Badge>
+              )}
+              {error && <Badge variant="destructive">Connection Error</Badge>}
+            </div>
+            <div className="flex items-center gap-2">
+              <MicActivity
+                stream={
+                  (localVideoRef.current?.srcObject as MediaStream) || null
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 h-[calc(100vh-12rem)]">
+        {/* Main Content Area */}
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Video Section */}
-          <div className="lg:col-span-2 flex flex-col gap-4 h-full">
-            {/* Camera Cards */}
-            <Card className="flex-1 flex flex-col">
-              <CardContent className="flex-1 p-4">
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 h-full">
-                  {/* Local Video */}
-                  <div className="relative group h-full">
-                    <video
-                      ref={localVideoRef}
-                      className="w-full h-full rounded-xl bg-muted shadow-lg object-cover"
-                      playsInline
-                    />
-                    <div className="absolute bottom-4 left-4 bg-background/90 backdrop-blur-sm rounded-lg px-4 py-2 text-base font-medium shadow-md">
-                      You
-                    </div>
-                    {!videoOn && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-xl">
-                        <div className="text-center text-muted-foreground">
-                          <VideoOff className="w-20 h-20 mx-auto mb-4" />
-                          <p className="text-xl">Camera off</p>
+          <div className="lg:col-span-3">
+            {/* Main Remote Video Card */}
+            <Card className="flex flex-col">
+              <CardHeader className="px-6 py-2">
+                <CardTitle className="text-base">
+                  {getRole() === 'doctor' ? 'Patient' : 'Doctor'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 px-5 pt-2 pb-4">
+                <div className="relative h-full min-h-[50vh] max-h-[70vh]">
+                  <video
+                    ref={remoteVideoRef}
+                    className="w-full h-full object-cover rounded-lg bg-muted"
+                    playsInline
+                  />
+
+                  {/* Local Video Preview - Small overlay in bottom right */}
+                  <div className="absolute bottom-4 right-4 z-20 w-32 h-24 lg:w-48 lg:h-36">
+                    <div className="relative w-full h-full rounded-lg overflow-hidden border border-border bg-card shadow-sm">
+                      <video
+                        ref={localVideoRef}
+                        className="w-full h-full object-cover bg-muted"
+                        playsInline
+                        muted
+                      />
+
+                      {!videoOn && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                          <div className="text-center text-muted-foreground">
+                            <VideoOff className="w-6 h-6 mx-auto mb-1" />
+                            <p className="text-xs">You</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+
+                      {videoOn && (
+                        <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 py-0.5 rounded">
+                          You
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Remote Video */}
-                  <div className="relative group h-full">
-                    <video
-                      ref={remoteVideoRef}
-                      className="w-full h-full rounded-xl bg-muted shadow-lg object-cover"
-                      playsInline
-                    />
-                    <div className="absolute bottom-4 left-4 bg-background/90 backdrop-blur-sm rounded-lg px-4 py-2 text-base font-medium shadow-md">
-                      {getRole() === 'doctor' ? 'Patient' : 'Doctor'}
-                    </div>
-                    {connecting && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-xl">
-                        <div className="text-center text-muted-foreground">
-                          <div className="w-20 h-20 border-3 border-muted-foreground border-t-primary rounded-full animate-spin mx-auto mb-4" />
-                          <p className="text-xl">Connecting...</p>
-                        </div>
+                  {connecting && (
+                    <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center bg-muted rounded-lg">
+                      <div className="text-center text-muted-foreground">
+                        <div className="w-16 h-16 border-4 border-muted-foreground border-t-primary rounded-full animate-spin mx-auto mb-4" />
+                        <p className="text-lg">Connecting...</p>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {!connecting && (
+                    <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center bg-muted rounded-lg">
+                      <div className="text-center text-muted-foreground">
+                        <UserCircle2 className="w-20 h-20 mx-auto mb-4" />
+                        <p className="text-lg">
+                          Waiting for{' '}
+                          {getRole() === 'doctor' ? 'patient' : 'doctor'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {error && (
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 text-destructive mt-4">
-                    <div className="w-3 h-3 bg-destructive rounded-full" />
-                    <span className="text-base">{error}</span>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-destructive/10 text-destructive mt-4">
+                    <div className="w-2 h-2 bg-destructive rounded-full" />
+                    <span className="text-sm">{error}</span>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Video Controls Bar */}
-            <Card className="shrink-0">
+            {/* Controls Card - Aligned with camera view column */}
+            <Card className="shrink-0 mt-4">
               <CardContent className="p-4">
-                <div className="flex flex-wrap items-center justify-center gap-3">
+                <div className="flex items-center justify-center gap-3">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -362,25 +371,26 @@ export default function SessionPage() {
             </Card>
           </div>
 
-          {/* Chat and Notes Section */}
-          <div className="space-y-4">
-            <Card>
+          {/* Sidebar */}
+          <div className="flex flex-col gap-4">
+            {/* Chat Card */}
+            <Card className="flex-1 flex flex-col">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <MessageSquare className="w-4 h-4" />
                   Chat
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <ScrollArea className="h-64 rounded-md border p-3">
-                  <div className="space-y-2">
+              <CardContent className="flex-1 flex flex-col gap-3">
+                <ScrollArea className="flex-1 min-h-[200px]">
+                  <div className="space-y-2 pr-3">
                     {(serverMessages ?? []).map((m) => (
                       <div
                         key={m._id}
                         className={`flex ${m.sender === getRole() ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                          className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                             m.sender === getRole()
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-muted text-muted-foreground'
@@ -399,7 +409,7 @@ export default function SessionPage() {
                         className={`flex ${m.from === 'me' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                          className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                             m.from === 'me'
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-muted text-muted-foreground'
@@ -412,10 +422,10 @@ export default function SessionPage() {
                   </div>
                 </ScrollArea>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                   <Textarea
                     placeholder="Type a message..."
-                    className="min-h-[40px] resize-none"
+                    className="min-h-[40px] resize-none flex-1"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -438,10 +448,13 @@ export default function SessionPage() {
               </CardContent>
             </Card>
 
-            <NotesPanel
-              sessionId={sessionId}
-              readOnly={getRole() !== 'doctor'}
-            />
+            {/* Notes Card */}
+            <Card className="shrink-0">
+              <NotesPanel
+                sessionId={sessionId}
+                readOnly={getRole() !== 'doctor'}
+              />
+            </Card>
           </div>
         </div>
 
