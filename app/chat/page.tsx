@@ -27,7 +27,7 @@ import {
 import { Actions, Action } from '@/components/ai-elements/actions';
 import { Response } from '@/components/ai-elements/response';
 import { Button } from '@/components/ui/button';
-import { CopyIcon, RefreshCcwIcon, ArrowLeft } from 'lucide-react';
+import { CopyIcon, RefreshCcwIcon, ArrowLeft, Plus } from 'lucide-react';
 import {
   Source,
   Sources,
@@ -45,7 +45,7 @@ import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion';
 const AVAILABLE_MODEL = 'Intelligent-Internet/II-Medical-8B';
 
 // Extract the component that uses useSearchParams
-function ChatPageContent() {
+function ChatPageContent({ onNewChat }: { onNewChat: () => void }) {
   const [input, setInput] = useState('');
   const [model, setModel] = useState<string>(AVAILABLE_MODEL);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -106,7 +106,7 @@ function ChatPageContent() {
   return (
     <div className="max-w-4xl mx-auto p-6 relative size-full h-screen">
       <div className="flex flex-col h-full">
-        {/* Header with back button */}
+        {/* Header with back & new chat buttons */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <Button
@@ -117,6 +117,17 @@ function ChatPageContent() {
             >
               <ArrowLeft className="w-4 h-4" />
               Back to Waiting Room
+            </Button>
+          </div>
+          <div>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onNewChat}
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              New Chat
             </Button>
           </div>
         </div>
@@ -276,9 +287,17 @@ function ChatPageLoading() {
 }
 
 export default function ChatPage() {
+  const [chatKey, setChatKey] = useState(0);
+
+  const handleNewChat = () => {
+    setChatKey((k) => k + 1);
+  };
+
   return (
     <Suspense fallback={<ChatPageLoading />}>
-      <ChatPageContent />
+      <div key={chatKey}>
+        <ChatPageContent onNewChat={handleNewChat} />
+      </div>
     </Suspense>
   );
 }
