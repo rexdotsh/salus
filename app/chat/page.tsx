@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Fragment, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
@@ -87,7 +87,12 @@ function ChatPageContent() {
     setInput('');
   };
 
-  const suggestions = ['Hello!', 'What can you do?', 'Tell me a joke.'];
+  const suggestions = [
+    'I have new symptoms and I am not sure what to do next.',
+    'What warning signs right now should make me seek urgent care?',
+    'Help me understand my recent test results.',
+    'Could my current medications interact with each other?',
+  ];
 
   const handleBackToWaitingRoom = () => {
     if (sessionId) {
@@ -145,7 +150,7 @@ function ChatPageContent() {
                   switch (part.type) {
                     case 'text':
                       return (
-                        <Fragment key={`${message.id}-${i}`}>
+                        <div key={`${message.id}-${i}`}>
                           <Message from={message.role}>
                             <MessageContent>
                               <Response>{part.text}</Response>
@@ -170,7 +175,7 @@ function ChatPageContent() {
                                 </Action>
                               </Actions>
                             )}
-                        </Fragment>
+                        </div>
                       );
                     case 'reasoning':
                       return (
