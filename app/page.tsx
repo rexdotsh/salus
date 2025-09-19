@@ -10,7 +10,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Link href="/" className="inline-flex items-center gap-2">
             <Image
-              src="/salus.png"
+              src="/salus.webp"
               alt=""
               width={120}
               height={40}
