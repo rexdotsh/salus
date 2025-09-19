@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { Badge } from '@/components/ui/badge';
 
 type QueueItem = {
   sessionId: string;
@@ -43,6 +44,16 @@ export default function DoctorQueuePage() {
       (filterUrgency === 'all' || x.urgency === filterUrgency) &&
       (search === '' || x.sessionId.includes(search)),
   );
+
+  const urgencyRank: Record<QueueItem['urgency'], number> = {
+    routine: 2,
+    urgent: 1,
+    emergency: 0,
+  };
+
+  const sorted = [...filtered].sort((a, b) => {
+    return urgencyRank[a.urgency] - urgencyRank[b.urgency];
+  });
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
@@ -78,20 +89,41 @@ export default function DoctorQueuePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
               <div className="text-sm text-muted-foreground">
                 No patients in queue yet.
               </div>
             ) : (
-              filtered.map((q) => (
+              sorted.map((q) => (
                 <div
                   key={q.sessionId}
-                  className="flex items-center justify-between rounded-md border border-border p-3"
+                  className={`flex items-center justify-between rounded-md border p-3 ${
+                    q.urgency === 'emergency'
+                      ? 'border-destructive/50 bg-destructive/5'
+                      : q.urgency === 'urgent'
+                        ? 'border-yellow-600/40 bg-yellow-500/5'
+                        : 'border-border'
+                  }`}
                 >
                   <div className="space-y-1">
                     <div className="font-medium">{q.sessionId}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {q.category} • {q.urgency} • {q.language}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{q.category}</span>
+                      <Badge
+                        variant={
+                          q.urgency === 'emergency'
+                            ? 'destructive'
+                            : 'secondary'
+                        }
+                        className={
+                          q.urgency === 'urgent'
+                            ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300'
+                            : ''
+                        }
+                      >
+                        {q.urgency}
+                      </Badge>
+                      <span>{q.language}</span>
                     </div>
                   </div>
                   <Button
