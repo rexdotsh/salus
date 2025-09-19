@@ -1,5 +1,5 @@
 # Salus (/ˈsaː.lus/)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/rexdotsh/salus)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/rexdotsh/salus) [![Website Deployed](https://deploy-badge.vercel.app/vercel?url=https%3A%2F%2Fsalus.rex.wf&name=Vercel)](https://salus.rex.wf)
 
 > Salus is the Latin word for "health," "safety," or "welfare." In Roman mythology, Salus was also the goddess of safety and well-being.
 
