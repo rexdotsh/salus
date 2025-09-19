@@ -99,6 +99,8 @@ export function App({ sessionToken }: { sessionToken?: string }) {
             doctor={state.doctor}
             position={state.queuePosition}
             onSwitchToAI={() => router.replace('AI_CHAT')}
+            sessionId={state.session?.id}
+            onEnterChat={() => router.replace('SESSION_CHAT')}
           />
         )}
         {state.screen === 'SESSION_CHAT' && state.session && (

@@ -60,6 +60,7 @@ export default function SessionPage() {
   const [muted, setMuted] = useState(false);
   const [videoOn, setVideoOn] = useState(false);
   const [showTui, setShowTui] = useState(false);
+  const [hasRemote, setHasRemote] = useState(false);
 
   const serverMessages = useQuery(
     api.index.listMessages,
@@ -92,6 +93,8 @@ export default function SessionPage() {
           v.srcObject = remote;
           v.play().catch(() => {});
         }
+        setHasRemote(true);
+        setConnecting(false);
       },
       onData: () => {},
       onError: (msg) => setError(msg),
@@ -119,6 +122,7 @@ export default function SessionPage() {
     return () => {
       engineRef.current?.close();
       pcRef.current = null;
+      setHasRemote(false);
     };
   }, [sessionId, setStatus]);
 
@@ -224,6 +228,7 @@ export default function SessionPage() {
                         ref={remoteVideoRef}
                         className="w-full h-full object-cover"
                         playsInline
+                        autoPlay
                       />
 
                       {(() => {
@@ -243,7 +248,7 @@ export default function SessionPage() {
                             </div>
                           );
                         }
-                        if (connecting) {
+                        if (connecting && !hasRemote) {
                           return (
                             <div className="absolute inset-0 flex items-center justify-center bg-muted">
                               <div className="text-center text-muted-foreground">
@@ -256,7 +261,7 @@ export default function SessionPage() {
                         return null;
                       })()}
 
-                      {!connecting && (
+                      {!connecting && !hasRemote && (
                         <div className="absolute inset-0 flex items-center justify-center bg-muted">
                           <div className="text-center text-muted-foreground">
                             <UserCircle2 className="size-16 mx-auto mb-3" />
@@ -282,6 +287,7 @@ export default function SessionPage() {
                         ref={localVideoRef}
                         className="w-full h-full object-cover"
                         playsInline
+                        autoPlay
                         muted
                       />
 

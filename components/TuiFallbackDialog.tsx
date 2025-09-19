@@ -16,7 +16,8 @@ type Props = {
 };
 
 export function TuiFallbackDialog({ open, onOpenChange, sessionId }: Props) {
-  const sshCommand = `ssh tui.salus.rex.wf -t ${sessionId}`;
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+  const sshCommand = `ssh tui.salus.rex.wf -t ${sessionId}${url ? ` --url=${url}` : ''}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

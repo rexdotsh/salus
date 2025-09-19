@@ -6,7 +6,13 @@ export type SessionMessage = {
   text: string;
 };
 
+let convexUrlOverride: string | null = null;
+export function setConvexUrl(url: string) {
+  convexUrlOverride = url;
+}
+
 function getConvexUrl(): string {
+  if (convexUrlOverride) return convexUrlOverride;
   const url = process.env.NEXT_PUBLIC_CONVEX_URL || process.env.CONVEX_URL;
   if (!url) throw new Error('Convex URL not set (NEXT_PUBLIC_CONVEX_URL)');
   return url;
@@ -76,6 +82,46 @@ export function startMessagesPolling(
       onUpdate(mapped);
     } catch {
       // ignore transient errors
+    } finally {
+      if (!stopped) timer = setTimeout(tick, intervalMs);
+    }
+  };
+
+  tick();
+
+  return {
+    stop() {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    },
+  };
+}
+
+export type SessionStatus = 'waiting' | 'claimed' | 'in_call' | 'ended';
+
+export function startQueuePolling(
+  client: ReturnType<typeof createConvexClient>,
+  sessionId: string,
+  onUpdate: (info: { status: SessionStatus; position: number | null }) => void,
+  intervalMs = 1000,
+) {
+  let stopped = false;
+  let timer: NodeJS.Timeout | null = null;
+
+  const tick = async () => {
+    if (stopped) return;
+    try {
+      const session = await client.query(api.index.getSession, { sessionId });
+      const status = (session?.status ?? 'waiting') as SessionStatus;
+      let position: number | null = null;
+      try {
+        const queue = await client.query(api.index.listQueue, {});
+        const idx = queue.findIndex((s) => s.sessionId === sessionId);
+        position = idx >= 0 ? idx + 1 : null;
+      } catch {}
+      onUpdate({ status, position });
+    } catch {
+      // ignore
     } finally {
       if (!stopped) timer = setTimeout(tick, intervalMs);
     }

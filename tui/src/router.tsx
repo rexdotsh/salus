@@ -1,5 +1,5 @@
 import { useKeyboard } from '@opentui/react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { AppState, ScreenKey, UrgencyLevel } from './types';
 import {
   detectConnectionStatus,
@@ -44,6 +44,7 @@ export function useAppRouter(sessionToken?: string) {
     }
     return base;
   });
+  const [autoQueued, setAutoQueued] = useState(false);
 
   const push = useCallback((next: ScreenKey) => {
     setState((s) => ({ ...s, stack: [...s.stack, s.screen], screen: next }));
@@ -250,6 +251,41 @@ export function useAppRouter(sessionToken?: string) {
   });
 
   // Session persistence is intentionally disabled to avoid caching inputs across sessions.
+  useEffect(() => {
+    if (!autoQueued && state.session?.id) {
+      // Auto-enqueue once when a session token is provided
+      (async () => {
+        try {
+          const client = createConvexClient();
+          const a = state.triage.answers;
+          const urgency = (state.triage.urgency ?? 'Routine').toLowerCase() as
+            | 'routine'
+            | 'urgent'
+            | 'emergency';
+          const category = a.mainSymptom ?? 'general';
+          const language = 'en';
+          const symptoms = [
+            a.mainSymptom,
+            a.duration,
+            a.severity ? `sev${a.severity}` : undefined,
+          ]
+            .filter(Boolean)
+            .join(' ');
+          await enqueueToQueue(client, {
+            sessionId: state.session.id,
+            triage: { category, urgency, language, symptoms },
+          });
+          setQueue(0);
+        } catch {}
+        setAutoQueued(true);
+      })();
+    }
+  }, [
+    autoQueued,
+    state.session?.id,
+    state.triage.answers,
+    state.triage.urgency,
+  ]);
 
   async function joinDoctorQueue(sessionId: string) {
     const client = createConvexClient();
