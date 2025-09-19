@@ -123,7 +123,8 @@ export function useAppRouter() {
             if (assistantIndex >= 0 && assistantIndex < msgs.length) {
               msgs[assistantIndex] = {
                 role: 'assistant',
-                content: 'AI not configured. Set OPENROUTER_API_KEY.',
+                content:
+                  'AI not configured. Set VLLM_API_KEY and VLLM_BASE_URL.',
               };
             }
             return { ...s, chat: { ...s.chat, messages: msgs } };
