@@ -1,41 +1,24 @@
 import type { ChatMessage } from '../types';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateText, streamText } from 'ai';
 
-export const OPENROUTER_MODEL = 'meta-llama/llama-3.3-8b-instruct:free';
-export const OLLAMA_MODEL = 'Intelligent-Internet/II-Medical-8B';
+export const VLLM_MODEL = 'Intelligent-Internet/II-Medical-8B';
 
-function getOpenRouterApiKey(): string | undefined {
-  return (
-    process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY
-  );
-}
-
-function getOllamaConfig() {
+function getVllmConfig() {
   return {
-    apiKey: process.env.OLLAMA_API_KEY || '',
-    baseURL: process.env.OLLAMA_BASE_URL || 'http://202.215.136.222:52550/v1',
+    apiKey: process.env.VLLM_API_KEY || '',
+    baseURL: process.env.VLLM_BASE_URL || '',
   };
 }
 
-function getAiProvider(): 'openrouter' | 'ollama' {
-  return (process.env.AI_PROVIDER as 'openrouter' | 'ollama') || 'openrouter';
-}
-
 function getModelName(): string {
-  return getAiProvider() === 'ollama' ? OLLAMA_MODEL : OPENROUTER_MODEL;
+  return VLLM_MODEL;
 }
 
-function getOpenRouter() {
-  const apiKey = getOpenRouterApiKey();
-  return createOpenRouter({ apiKey: apiKey ?? '' });
-}
-
-function getOllama() {
-  const config = getOllamaConfig();
+function getVllm() {
+  const config = getVllmConfig();
   return createOpenAICompatible({
-    name: 'ollama',
+    name: 'vllm',
     apiKey: config.apiKey,
     baseURL: config.baseURL,
   });
@@ -68,12 +51,8 @@ function postprocess(text: string): string {
 }
 
 export function isAiConfigured(): boolean {
-  const provider = getAiProvider();
-  if (provider === 'ollama') {
-    const config = getOllamaConfig();
-    return Boolean(config.apiKey && config.baseURL);
-  }
-  return Boolean(getOpenRouterApiKey());
+  const config = getVllmConfig();
+  return Boolean(config.apiKey && config.baseURL);
 }
 
 export async function generateAiReply(
@@ -81,23 +60,15 @@ export async function generateAiReply(
   opts?: { signal?: AbortSignal },
 ): Promise<string> {
   if (!isAiConfigured()) {
-    const provider = getAiProvider();
-    return `AI is not configured. Set ${provider === 'ollama' ? 'OLLAMA_API_KEY and OLLAMA_BASE_URL' : 'OPENROUTER_API_KEY'} to enable advice.`;
+    return 'AI is not configured. Set VLLM_API_KEY and VLLM_BASE_URL to enable advice.';
   }
 
-  const provider = getAiProvider();
   const modelName = getModelName();
   const prompt = buildPrompt(messages);
 
   try {
-    let model: any;
-    if (provider === 'ollama') {
-      const ollama = getOllama();
-      model = ollama(modelName);
-    } else {
-      const openrouter = getOpenRouter();
-      model = openrouter.chat(modelName);
-    }
+    const vllm = getVllm();
+    const model: any = vllm(modelName);
 
     const { text } = await generateText({
       model,
@@ -109,7 +80,7 @@ export async function generateAiReply(
     return postprocess(text);
   } catch (e) {
     try {
-      console.log(`[${provider}] generateText error`, String(e));
+      console.log('[VLLM] generateText error', String(e));
     } catch {}
     return 'Unable to reach AI service right now. Please try again.';
   }
@@ -131,14 +102,13 @@ export async function generateAiReplyStream(
       opts.onLog?.(line);
     } catch {}
     try {
-      const provider = getAiProvider();
-      console.log(`[${provider.toUpperCase()}][UI]`, line);
+      console.log('[VLLM][UI]', line);
     } catch {}
   };
 
   if (!isAiConfigured()) {
-    const provider = getAiProvider();
-    const errorMsg = `${provider} API key missing. Set ${provider === 'ollama' ? 'OLLAMA_API_KEY and OLLAMA_BASE_URL' : 'OPENROUTER_API_KEY'}.`;
+    const errorMsg =
+      'vllm API key missing. Set VLLM_API_KEY and VLLM_BASE_URL.';
     log(errorMsg);
     try {
       opts.onError?.(errorMsg);
@@ -146,7 +116,6 @@ export async function generateAiReplyStream(
     return Promise.resolve();
   }
 
-  const provider = getAiProvider();
   const modelName = getModelName();
   const prompt = buildPrompt(messages);
   const parts: Array<string> = [];
@@ -158,14 +127,8 @@ export async function generateAiReplyStream(
     } catch {}
     log(`Starting stream with model: ${modelName}`);
 
-    let model: any;
-    if (provider === 'ollama') {
-      const ollama = getOllama();
-      model = ollama(modelName);
-    } else {
-      const openrouter = getOpenRouter();
-      model = openrouter.chat(modelName);
-    }
+    const vllm = getVllm();
+    const model: any = vllm(modelName);
 
     result = streamText({
       model,
