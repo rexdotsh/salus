@@ -3,6 +3,10 @@
   "module": "src/index.tsx",
   "type": "module",
   "private": true,
+  "scripts": {
+    "build": "bun build src/index.tsx --outdir=dist --target=bun",
+    "start": "bun run dist/index.js"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -13,6 +17,8 @@
     "@ai-sdk/openai-compatible": "^1.0.18",
     "@opentui/core": "^0.1.23",
     "@opentui/react": "^0.1.23",
+    "ai": "^5.0.47",
+    "convex": "^1.27.1",
     "react": "^19.1.1"
   }
 }
