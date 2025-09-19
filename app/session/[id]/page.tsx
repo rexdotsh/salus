@@ -2,9 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-// PeerJS is used inside the engine
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -37,8 +42,6 @@ import {
 type Role = 'patient' | 'doctor';
 
 function getRole(): Role {
-  // Naive: if coming from doctor queue use 'doctor', else 'patient'
-  // Can be replaced by stronger role detection later
   const ref = document.referrer || '';
   if (ref.includes('/doctor')) return 'doctor';
   return 'patient';
@@ -56,7 +59,6 @@ export default function SessionPage() {
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [videoOn, setVideoOn] = useState(false);
-  const [messages] = useState<Array<{ from: 'me' | 'peer'; text: string }>>([]);
   const [showTui, setShowTui] = useState(false);
 
   const serverMessages = useQuery(
@@ -101,10 +103,7 @@ export default function SessionPage() {
           v.muted = true;
           v.play().catch(() => {});
         }
-        // Best-effort: some engines may expose an internal pc for stats.
-        // @ts-ignore accessing internal for stats only
         pcRef.current = engine.pc ?? null;
-        // Mark session as in_call
         if (sessionId) {
           try {
             await setStatus({ sessionId, status: 'in_call' });
@@ -117,10 +116,9 @@ export default function SessionPage() {
       engineRef.current?.close();
       pcRef.current = null;
     };
-  }, [sessionId]);
+  }, [sessionId, setStatus]);
 
   function toggleMute() {
-    // Route through engine to ensure underlying stream state updates consistently
     engineRef.current?.setMuted(!muted);
     setMuted((m) => !m);
   }
@@ -143,7 +141,6 @@ export default function SessionPage() {
     if (!textarea) return;
     const text = textarea.value.trim();
     if (!text) return;
-    // Persist to Convex; UI reads from serverMessages
     if (sessionId) {
       void sendServerMessage({ sessionId, sender: getRole(), text });
     }
@@ -153,72 +150,108 @@ export default function SessionPage() {
   return (
     <TooltipProvider>
       <main className="h-screen flex flex-col overflow-hidden p-4 gap-4">
-        {/* Status Header */}
-        <Card className="shrink-0 p-0">
-          <CardContent className="flex items-center justify-between p-4">
+        <Card className="shrink-0">
+          <CardContent className="flex items-center justify-between px-4 py-2">
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="px-3 py-1">
                 {getRole() === 'doctor' ? (
                   <>
-                    <Stethoscope className="w-4 h-4 mr-2" />
+                    <Stethoscope className="size-4 mr-2" />
                     Doctor
                   </>
                 ) : (
                   <>
-                    <UserCircle2 className="w-4 h-4 mr-2" />
+                    <UserCircle2 className="size-4 mr-2" />
                     Patient
                   </>
                 )}
               </Badge>
               {connecting && (
                 <Badge variant="secondary">
-                  <div className="w-2 h-2 bg-accent rounded-full animate-pulse mr-2" />
+                  <div className="size-2 bg-accent rounded-full animate-pulse mr-2" />
                   Connecting...
                 </Badge>
               )}
               {!connecting && !error && (
                 <Badge variant="default">
-                  <div className="w-2 h-2 bg-primary-foreground rounded-full mr-2" />
+                  <div className="size-2 bg-primary-foreground rounded-full mr-2" />
                   Connected
                 </Badge>
               )}
               {error && <Badge variant="destructive">Connection Error</Badge>}
             </div>
-            <div className="flex items-center gap-2">
-              <MicActivity
-                stream={
-                  (localVideoRef.current?.srcObject as MediaStream) || null
-                }
-              />
-            </div>
+            <MicActivity
+              stream={(localVideoRef.current?.srcObject as MediaStream) || null}
+            />
           </CardContent>
         </Card>
 
-        {/* Main Content Area */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4">
-          {/* Video Section */}
-          <div className="lg:col-span-3">
-            {/* Main Remote Video Card */}
-            <Card className="flex flex-col">
-              <CardHeader className="px-6 py-2">
-                <CardTitle className="text-base">
-                  {getRole() === 'doctor' ? 'Patient' : 'Doctor'}
+        <div className="flex-1 grid grid-cols-1 xl:grid-cols-4 gap-4 min-h-0">
+          <div className="xl:col-span-3 flex flex-col gap-4 min-h-0">
+            <Card className="flex-1 flex flex-col min-h-0">
+              <CardHeader className="shrink-0 pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Video className="size-5" />
+                  Video Conference
                 </CardTitle>
+                <CardDescription>
+                  {connecting
+                    ? 'Establishing connection...'
+                    : 'Live session in progress'}
+                </CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 px-5 pt-2 pb-4">
-                <div className="relative h-full min-h-[50vh] max-h-[70vh]">
-                  <video
-                    ref={remoteVideoRef}
-                    className="w-full h-full object-cover rounded-lg bg-muted"
-                    playsInline
-                  />
+              <CardContent className="flex-1 min-h-0 p-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
+                  <div className="flex flex-col min-h-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium">
+                        {getRole() === 'doctor' ? 'Patient' : 'Doctor'}
+                      </h3>
+                      <Badge variant="outline" className="text-xs">
+                        {connecting ? 'Connecting' : 'Remote'}
+                      </Badge>
+                    </div>
+                    <div className="relative flex-1 min-h-0 bg-muted rounded-lg overflow-hidden">
+                      <video
+                        ref={remoteVideoRef}
+                        className="w-full h-full object-cover"
+                        playsInline
+                      />
 
-                  {/* Local Video Preview - Small overlay in bottom right */}
-                  <div className="absolute bottom-4 right-4 z-20 w-32 h-24 lg:w-48 lg:h-36">
-                    <div className="relative w-full h-full rounded-lg overflow-hidden border border-border bg-card shadow-sm">
+                      {connecting && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                          <div className="text-center text-muted-foreground">
+                            <div className="size-12 border-4 border-muted-foreground border-t-primary rounded-full animate-spin mx-auto mb-3" />
+                            <p className="text-sm">Connecting...</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {!connecting && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                          <div className="text-center text-muted-foreground">
+                            <UserCircle2 className="size-16 mx-auto mb-3" />
+                            <p className="text-sm">
+                              Waiting for{' '}
+                              {getRole() === 'doctor' ? 'patient' : 'doctor'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col min-h-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium">You</h3>
+                      <Badge variant="outline" className="text-xs">
+                        {videoOn ? 'Camera On' : 'Camera Off'}
+                      </Badge>
+                    </div>
+                    <div className="relative flex-1 min-h-0 bg-muted rounded-lg overflow-hidden">
                       <video
                         ref={localVideoRef}
-                        className="w-full h-full object-cover bg-muted"
+                        className="w-full h-full object-cover"
                         playsInline
                         muted
                       />
@@ -226,67 +259,32 @@ export default function SessionPage() {
                       {!videoOn && (
                         <div className="absolute inset-0 flex items-center justify-center bg-muted">
                           <div className="text-center text-muted-foreground">
-                            <VideoOff className="w-6 h-6 mx-auto mb-1" />
-                            <p className="text-xs">You</p>
+                            <VideoOff className="size-16 mx-auto mb-3" />
+                            <p className="text-sm">Camera Off</p>
                           </div>
                         </div>
                       )}
-
-                      {videoOn && (
-                        <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 py-0.5 rounded">
-                          You
-                        </div>
-                      )}
                     </div>
                   </div>
-
-                  {connecting && (
-                    <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center bg-muted rounded-lg">
-                      <div className="text-center text-muted-foreground">
-                        <div className="w-16 h-16 border-4 border-muted-foreground border-t-primary rounded-full animate-spin mx-auto mb-4" />
-                        <p className="text-lg">Connecting...</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!connecting && (
-                    <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center bg-muted rounded-lg">
-                      <div className="text-center text-muted-foreground">
-                        <UserCircle2 className="w-20 h-20 mx-auto mb-4" />
-                        <p className="text-lg">
-                          Waiting for{' '}
-                          {getRole() === 'doctor' ? 'patient' : 'doctor'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
-
-                {error && (
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-destructive/10 text-destructive mt-4">
-                    <div className="w-2 h-2 bg-destructive rounded-full" />
-                    <span className="text-sm">{error}</span>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
-            {/* Controls Card - Aligned with camera view column */}
-            <Card className="shrink-0 mt-4">
+            <Card className="shrink-0">
               <CardContent className="p-4">
-                <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center justify-center gap-3 flex-wrap">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         onClick={toggleMute}
                         variant={muted ? 'destructive' : 'default'}
-                        size="lg"
-                        className="h-14 px-8"
+                        size="sm"
+                        className="h-10 px-4"
                       >
                         {muted ? (
-                          <MicOff className="w-6 h-6 mr-2" />
+                          <MicOff className="size-4 mr-2" />
                         ) : (
-                          <Mic className="w-6 h-6 mr-2" />
+                          <Mic className="size-4 mr-2" />
                         )}
                         {muted ? 'Unmute' : 'Mute'}
                       </Button>
@@ -301,15 +299,15 @@ export default function SessionPage() {
                       <Button
                         onClick={toggleVideo}
                         variant={videoOn ? 'default' : 'secondary'}
-                        size="lg"
-                        className="h-14 px-8"
+                        size="sm"
+                        className="h-10 px-4"
                       >
                         {videoOn ? (
-                          <Video className="w-6 h-6 mr-2" />
+                          <Video className="size-4 mr-2" />
                         ) : (
-                          <VideoOff className="w-6 h-6 mr-2" />
+                          <VideoOff className="size-4 mr-2" />
                         )}
-                        {videoOn ? 'Camera On' : 'Camera Off'}
+                        Camera
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -317,17 +315,18 @@ export default function SessionPage() {
                     </TooltipContent>
                   </Tooltip>
 
-                  <Separator orientation="vertical" className="h-10" />
+                  <Separator orientation="vertical" className="h-6" />
 
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         variant="outline"
                         onClick={() => setShowTui(true)}
-                        className="h-14 px-6"
+                        size="sm"
+                        className="h-10 px-4"
                       >
-                        <Terminal className="w-6 h-6 mr-2" />
-                        TUI Fallback
+                        <Terminal className="size-4 mr-2" />
+                        TUI
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -338,12 +337,13 @@ export default function SessionPage() {
                   <Button
                     onClick={() => router.refresh()}
                     variant="outline"
-                    className="h-14 px-6"
+                    size="sm"
+                    className="h-10 px-4"
                   >
                     Reconnect
                   </Button>
 
-                  <Separator orientation="vertical" className="h-10" />
+                  <Separator orientation="vertical" className="h-6" />
 
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -357,10 +357,10 @@ export default function SessionPage() {
                           router.push(`/session/${sessionId}/summary`);
                         }}
                         variant="destructive"
-                        size="lg"
-                        className="h-14 px-8"
+                        size="sm"
+                        className="h-10 px-4"
                       >
-                        <PhoneOff className="w-6 h-6 mr-2" />
+                        <PhoneOff className="size-4 mr-2" />
                         End Call
                       </Button>
                     </TooltipTrigger>
@@ -369,28 +369,40 @@ export default function SessionPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {error && (
+              <Card className="shrink-0 border-destructive">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-destructive">
+                    <div className="size-2 bg-destructive rounded-full" />
+                    <span className="text-sm">{error}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {/* Sidebar */}
-          <div className="flex flex-col gap-4">
-            {/* Chat Card */}
-            <Card className="flex-1 flex flex-col">
-              <CardHeader className="pb-3">
+          <div className="flex flex-col gap-4 min-h-0">
+            <Card className="flex-1 flex flex-col min-h-0">
+              <CardHeader className="shrink-0 pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <MessageSquare className="w-4 h-4" />
+                  <MessageSquare className="size-4" />
                   Chat
                 </CardTitle>
+                <CardDescription>
+                  Communicate during the session
+                </CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col gap-3">
-                <ScrollArea className="flex-1 min-h-[200px]">
-                  <div className="space-y-2 pr-3">
+              <CardContent className="flex-1 flex flex-col gap-3 min-h-0">
+                <ScrollArea className="flex-1 min-h-0">
+                  <div className="space-y-3 pr-3">
                     {(serverMessages ?? []).map((m) => (
                       <div
                         key={m._id}
                         className={`flex ${m.sender === getRole() ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                          className={`max-w-[85%] rounded-lg px-3 py-2 ${
                             m.sender === getRole()
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-muted text-muted-foreground'
@@ -399,23 +411,7 @@ export default function SessionPage() {
                           <div className="text-xs opacity-70 mb-1">
                             {m.sender === 'doctor' ? 'Doctor' : 'Patient'}
                           </div>
-                          {m.text}
-                        </div>
-                      </div>
-                    ))}
-                    {messages.map((m, i) => (
-                      <div
-                        key={i}
-                        className={`flex ${m.from === 'me' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                            m.from === 'me'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground'
-                          }`}
-                        >
-                          {m.text}
+                          <p className="text-sm">{m.text}</p>
                         </div>
                       </div>
                     ))}
@@ -435,6 +431,7 @@ export default function SessionPage() {
                   />
                   <Button
                     size="icon"
+                    className="h-[40px] w-10"
                     onClick={() => {
                       const textarea = document.querySelector(
                         'textarea',
@@ -442,19 +439,17 @@ export default function SessionPage() {
                       sendMessage(textarea);
                     }}
                   >
-                    <Send className="w-4 h-4" />
+                    <Send className="size-4" />
                   </Button>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Notes Card */}
-            <Card className="shrink-0">
+            <div className="shrink-0">
               <NotesPanel
                 sessionId={sessionId}
                 readOnly={getRole() !== 'doctor'}
               />
-            </Card>
+            </div>
           </div>
         </div>
 
