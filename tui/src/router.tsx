@@ -5,11 +5,7 @@ import {
   detectConnectionStatus,
   getDoctorAvailability,
 } from './services/status';
-import {
-  generateAiReply,
-  generateAiReplyStream,
-  isAiConfigured,
-} from './services/ai';
+import { generateAiReplyStream, isAiConfigured } from './services/ai';
 import { assessRisk } from './utils/risk';
 import { createConvexClient, enqueueToQueue } from './services/convex';
 
@@ -182,18 +178,29 @@ export function useAppRouter(sessionToken?: string) {
                 }
                 return { ...s, chat: { ...s.chat, messages: msgs } };
               }),
+            onComplete: (full) =>
+              setState((s) => {
+                const msgs = s.chat.messages.slice();
+                if (assistantIndex >= 0 && assistantIndex < msgs.length) {
+                  msgs[assistantIndex] = {
+                    role: 'assistant',
+                    content: full || accumulated || '...',
+                  };
+                }
+                return { ...s, chat: { ...s.chat, messages: msgs } };
+              }),
+            onError: () =>
+              setState((s) => {
+                const msgs = s.chat.messages.slice();
+                if (assistantIndex >= 0 && assistantIndex < msgs.length) {
+                  msgs[assistantIndex] = {
+                    role: 'assistant',
+                    content: 'AI request failed.',
+                  };
+                }
+                return { ...s, chat: { ...s.chat, messages: msgs } };
+              }),
           });
-
-          if (!accumulated) {
-            const reply = await generateAiReply(sourceMessages);
-            setState((s) => {
-              const msgs = s.chat.messages.slice();
-              if (assistantIndex >= 0 && assistantIndex < msgs.length) {
-                msgs[assistantIndex] = { role: 'assistant', content: reply };
-              }
-              return { ...s, chat: { ...s.chat, messages: msgs } };
-            });
-          }
         } catch {
           setState((s) => {
             const msgs = s.chat.messages.slice();
@@ -252,7 +259,8 @@ export function useAppRouter(sessionToken?: string) {
 
   // Session persistence is intentionally disabled to avoid caching inputs across sessions.
   useEffect(() => {
-    if (!autoQueued && state.session?.id) {
+    const sessionId = state.session?.id;
+    if (!autoQueued && sessionId) {
       // Auto-enqueue once when a session token is provided
       (async () => {
         try {
@@ -272,7 +280,7 @@ export function useAppRouter(sessionToken?: string) {
             .filter(Boolean)
             .join(' ');
           await enqueueToQueue(client, {
-            sessionId: state.session.id,
+            sessionId,
             triage: { category, urgency, language, symptoms },
           });
           setQueue(0);
