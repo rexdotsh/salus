@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/tooltip';
 import { TuiFallbackDialog } from '@/components/TuiFallbackDialog';
 import { PeerJsEngine } from '@/lib/call/PeerJsEngine';
+import { authClient } from '@/lib/auth-client';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { NotesPanel } from '@/components/NotesPanel';
@@ -41,12 +42,6 @@ import {
 
 type Role = 'patient' | 'doctor';
 
-function getRole(): Role {
-  const ref = document.referrer || '';
-  if (ref.includes('/doctor')) return 'doctor';
-  return 'patient';
-}
-
 export default function SessionPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -55,7 +50,20 @@ export default function SessionPage() {
     [params],
   );
 
-  const [connecting, setConnecting] = useState(true);
+  const { data: authSession, isPending: authPending } = authClient.useSession();
+  const referrerRole = useMemo<Role>(() => {
+    const ref = typeof document !== 'undefined' ? document.referrer || '' : '';
+    return ref.includes('/doctor') ? 'doctor' : 'patient';
+  }, []);
+  const role = useMemo<Role>(
+    () =>
+      authPending ? referrerRole : authSession?.user ? 'doctor' : 'patient',
+    [authPending, authSession, referrerRole],
+  );
+  const roleReady = !authPending;
+
+  const [ready, setReady] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [videoOn, setVideoOn] = useState(false);
@@ -79,14 +87,16 @@ export default function SessionPage() {
   const pcRef = useRef<RTCPeerConnection | null>(null);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !roleReady) return;
 
-    const role: Role = getRole();
     const myId = `${role}-${sessionId}`;
     const otherId = `${role === 'patient' ? 'doctor' : 'patient'}-${sessionId}`;
 
     const engine = new PeerJsEngine(myId, otherId, {
-      onConnected: () => setConnecting(false),
+      onConnected: () => {
+        setIsConnected(true);
+        setError(null);
+      },
       onRemoteStream: (remote) => {
         const v = remoteVideoRef.current;
         if (v) {
@@ -94,15 +104,32 @@ export default function SessionPage() {
           v.play().catch(() => {});
         }
         setHasRemote(true);
-        setConnecting(false);
+        setIsConnected(true);
+        setError(null);
       },
       onData: () => {},
-      onError: (msg) => setError(msg),
+      onError: (msg) => {
+        const m = (msg || '').toLowerCase();
+        const isTransient =
+          m.includes('could not connect') ||
+          m.includes('peer-unavailable') ||
+          m.includes('not found') ||
+          m.includes('unavailable') ||
+          m.includes('ice') ||
+          m.includes('network');
+        if (isTransient) {
+          setError(null);
+          setIsConnected(false);
+          setReady(true);
+          return;
+        }
+        setError(msg);
+      },
     });
     engineRef.current = engine;
 
     engine
-      .start(true)
+      .start()
       .then(async (local) => {
         const v = localVideoRef.current;
         if (v) {
@@ -110,7 +137,10 @@ export default function SessionPage() {
           v.muted = true;
           v.play().catch(() => {});
         }
+
+        setVideoOn(local.getVideoTracks().length > 0);
         pcRef.current = engine.getPeerConnection();
+        setReady(true);
         if (sessionId) {
           try {
             await setStatus({ sessionId, status: 'in_call' });
@@ -124,7 +154,7 @@ export default function SessionPage() {
       pcRef.current = null;
       setHasRemote(false);
     };
-  }, [sessionId, setStatus]);
+  }, [sessionId, setStatus, role, roleReady]);
 
   function toggleMute() {
     engineRef.current?.setMuted(!muted);
@@ -150,7 +180,7 @@ export default function SessionPage() {
     const text = textarea.value.trim();
     if (!text) return;
     if (sessionId) {
-      void sendServerMessage({ sessionId, sender: getRole(), text });
+      void sendServerMessage({ sessionId, sender: role, text });
     }
     textarea.value = '';
   }
@@ -162,7 +192,7 @@ export default function SessionPage() {
           <CardContent className="flex items-center justify-between px-4 py-0">
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="px-3 py-1">
-                {getRole() === 'doctor' ? (
+                {role === 'doctor' ? (
                   <>
                     <Stethoscope className="size-4 mr-2" />
                     Doctor
@@ -174,13 +204,19 @@ export default function SessionPage() {
                   </>
                 )}
               </Badge>
-              {connecting && !error && (
+              {!error && !ready && (
                 <Badge variant="secondary">
                   <div className="size-2 bg-accent rounded-full animate-pulse mr-2" />
                   Connecting...
                 </Badge>
               )}
-              {!connecting && !error && (
+              {!error && ready && !isConnected && (
+                <Badge variant="secondary">
+                  <div className="size-2 bg-accent rounded-full mr-2" />
+                  Waiting for {role === 'doctor' ? 'patient' : 'doctor'}
+                </Badge>
+              )}
+              {!error && isConnected && (
                 <Badge variant="default">
                   <div className="size-2 bg-primary-foreground rounded-full mr-2" />
                   Connected
@@ -207,9 +243,11 @@ export default function SessionPage() {
                   Video Conference
                 </CardTitle>
                 <CardDescription>
-                  {connecting
-                    ? 'Establishing connection...'
-                    : 'Live session in progress'}
+                  {isConnected
+                    ? 'Live session in progress'
+                    : !error && !ready
+                      ? 'Establishing connection...'
+                      : 'Waiting for participant'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-1 min-h-0 p-4">
@@ -217,10 +255,14 @@ export default function SessionPage() {
                   <div className="flex flex-col min-h-0">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-sm font-medium">
-                        {getRole() === 'doctor' ? 'Patient' : 'Doctor'}
+                        {role === 'doctor' ? 'Patient' : 'Doctor'}
                       </h3>
                       <Badge variant="outline" className="text-xs">
-                        {connecting ? 'Connecting' : 'Remote'}
+                        {!error && !ready
+                          ? 'Connecting'
+                          : isConnected
+                            ? 'Connected'
+                            : 'Waiting'}
                       </Badge>
                     </div>
                     <div className="relative flex-1 min-h-0 bg-muted rounded-lg overflow-hidden">
@@ -235,7 +277,6 @@ export default function SessionPage() {
                         const hasPatientMessages = (serverMessages ?? []).some(
                           (m) => m.sender === 'patient',
                         );
-                        const role: Role = getRole();
                         if (role === 'doctor' && hasPatientMessages) {
                           return (
                             <div className="absolute inset-0 flex items-center justify-center bg-muted">
@@ -248,7 +289,7 @@ export default function SessionPage() {
                             </div>
                           );
                         }
-                        if (connecting && !hasRemote) {
+                        if (!error && !ready && !hasRemote) {
                           return (
                             <div className="absolute inset-0 flex items-center justify-center bg-muted">
                               <div className="text-center text-muted-foreground">
@@ -261,13 +302,13 @@ export default function SessionPage() {
                         return null;
                       })()}
 
-                      {!connecting && !hasRemote && (
+                      {ready && !hasRemote && !error && (
                         <div className="absolute inset-0 flex items-center justify-center bg-muted">
                           <div className="text-center text-muted-foreground">
                             <UserCircle2 className="size-16 mx-auto mb-3" />
                             <p className="text-sm">
                               Waiting for{' '}
-                              {getRole() === 'doctor' ? 'patient' : 'doctor'}
+                              {role === 'doctor' ? 'patient' : 'doctor'}
                             </p>
                           </div>
                         </div>
@@ -423,11 +464,11 @@ export default function SessionPage() {
                     {(serverMessages ?? []).map((m) => (
                       <div
                         key={m._id}
-                        className={`flex ${m.sender === getRole() ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${m.sender === role ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
                           className={`max-w-[85%] rounded-lg px-3 py-2 ${
-                            m.sender === getRole()
+                            m.sender === role
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-muted text-muted-foreground'
                           }`}
@@ -469,10 +510,7 @@ export default function SessionPage() {
               </CardContent>
             </Card>
             <div className="shrink-0">
-              <NotesPanel
-                sessionId={sessionId}
-                readOnly={getRole() !== 'doctor'}
-              />
+              <NotesPanel sessionId={sessionId} readOnly={role !== 'doctor'} />
             </div>
           </div>
         </div>
