@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import {
@@ -25,7 +26,8 @@ import {
 } from '@/components/ai-elements/prompt-input';
 import { Actions, Action } from '@/components/ai-elements/actions';
 import { Response } from '@/components/ai-elements/response';
-import { CopyIcon, RefreshCcwIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CopyIcon, RefreshCcwIcon, ArrowLeft } from 'lucide-react';
 import {
   Source,
   Sources,
@@ -45,9 +47,29 @@ const AVAILABLE_MODEL = 'Intelligent-Internet/II-Medical-8B';
 export default function ChatPage() {
   const [input, setInput] = useState('');
   const [model, setModel] = useState<string>(AVAILABLE_MODEL);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const { messages, sendMessage, status, regenerate } = useChat({
     transport: new DefaultChatTransport({ api: '/api/ai/chat' }),
   });
+
+  useEffect(() => {
+    // Check for session ID in URL params first
+    const sessionFromParams = searchParams.get('sessionId');
+    if (sessionFromParams) {
+      setSessionId(sessionFromParams);
+      return;
+    }
+
+    // Fallback: extract session ID from referrer if it's from a waiting room
+    const referrer = document.referrer;
+    const waitingRoomMatch = referrer.match(/\/session\/([^\/]+)\/waiting/);
+    if (waitingRoomMatch) {
+      setSessionId(waitingRoomMatch[1]);
+    }
+  }, [searchParams]);
 
   const handleSubmit = (message: PromptInputMessage) => {
     const hasText = Boolean(message.text);
@@ -66,9 +88,33 @@ export default function ChatPage() {
 
   const suggestions = ['Hello!', 'What can you do?', 'Tell me a joke.'];
 
+  const handleBackToWaitingRoom = () => {
+    if (sessionId) {
+      router.push(`/session/${sessionId}/waiting`);
+    } else {
+      // Fallback: go back in history
+      router.back();
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-6 relative size-full h-screen">
       <div className="flex flex-col h-full">
+        {/* Header with back button */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackToWaitingRoom}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Waiting Room
+            </Button>
+          </div>
+        </div>
+
         <Conversation className="h-full">
           <ConversationContent>
             {messages.map((message) => (
