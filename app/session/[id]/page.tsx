@@ -151,7 +151,7 @@ export default function SessionPage() {
     <TooltipProvider>
       <main className="h-screen flex flex-col overflow-hidden p-4 gap-4">
         <Card className="shrink-0">
-          <CardContent className="flex items-center justify-between px-4 py-2">
+          <CardContent className="flex items-center justify-between px-4 py-0">
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="px-3 py-1">
                 {getRole() === 'doctor' ? (
@@ -166,7 +166,7 @@ export default function SessionPage() {
                   </>
                 )}
               </Badge>
-              {connecting && (
+              {connecting && !error && (
                 <Badge variant="secondary">
                   <div className="size-2 bg-accent rounded-full animate-pulse mr-2" />
                   Connecting...
@@ -178,7 +178,11 @@ export default function SessionPage() {
                   Connected
                 </Badge>
               )}
-              {error && <Badge variant="destructive">Connection Error</Badge>}
+              {error && (
+                <Badge variant="destructive" className="px-3 py-1">
+                  {error}
+                </Badge>
+              )}
             </div>
             <MicActivity
               stream={(localVideoRef.current?.srcObject as MediaStream) || null}
@@ -369,17 +373,6 @@ export default function SessionPage() {
                 </div>
               </CardContent>
             </Card>
-
-            {error && (
-              <Card className="shrink-0 border-destructive">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-destructive">
-                    <div className="size-2 bg-destructive rounded-full" />
-                    <span className="text-sm">{error}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
 
           <div className="flex flex-col gap-4 min-h-0">
