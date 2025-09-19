@@ -17,6 +17,10 @@ export class PeerJsEngine implements CallEngine {
   async start(audioOnly = false): Promise<MediaStream> {
     this.ensureSecureContextOrThrow();
     this.peer = new Peer(this.myId, {
+      host: 'peerjs.rex.wf',
+      secure: true,
+      port: 443,
+      path: '/',
       config: {
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
       },
