@@ -14,7 +14,8 @@ export class PeerJsEngine implements CallEngine {
     private events: EngineEvents = {},
   ) {}
 
-  async start(audioOnly = true): Promise<MediaStream> {
+  async start(audioOnly = false): Promise<MediaStream> {
+    this.ensureSecureContextOrThrow();
     this.peer = new Peer(this.myId, {
       config: {
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
@@ -36,7 +37,12 @@ export class PeerJsEngine implements CallEngine {
           },
     };
 
-    this.local = await navigator.mediaDevices.getUserMedia(constraints);
+    try {
+      this.local = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (e: any) {
+      this.events.onError?.(this.formatGetUserMediaError(e));
+      throw e;
+    }
 
     await new Promise<void>((resolve, reject) => {
       if (!this.peer) return reject(new Error('Peer not created'));
@@ -47,10 +53,17 @@ export class PeerJsEngine implements CallEngine {
       });
     });
 
-    // Data
+    // Data (outgoing)
     this.conn = this.peer.connect(this.otherId);
     this.conn.on('open', () => this.events.onConnected?.());
     this.conn.on('data', (d) => this.events.onData?.(String(d)));
+
+    // Data (incoming)
+    this.peer.on('connection', (incoming) => {
+      this.conn = incoming;
+      incoming.on('open', () => this.events.onConnected?.());
+      incoming.on('data', (d) => this.events.onData?.(String(d)));
+    });
 
     // Media
     this.call = this.peer.call(this.otherId, this.local);
@@ -175,5 +188,46 @@ export class PeerJsEngine implements CallEngine {
     } catch {}
     this.pc = null;
     this.local = null;
+  }
+
+  private ensureSecureContextOrThrow(): void {
+    if (typeof window === 'undefined') return;
+    const host = window.location.hostname;
+    const isLocal =
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host.endsWith('.localhost');
+    const secure = window.isSecureContext || isLocal;
+    if (!secure) {
+      const msg =
+        'Camera/mic access requires HTTPS or http://localhost. Open this page over HTTPS.';
+      this.events.onError?.(msg);
+      throw new Error(msg);
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const msg =
+        'Camera/mic not available: navigator.mediaDevices.getUserMedia is undefined in this context.';
+      this.events.onError?.(msg);
+      throw new Error(msg);
+    }
+  }
+
+  private formatGetUserMediaError(err: any): string {
+    const name: string = err?.name ?? 'Error';
+    switch (name) {
+      case 'NotAllowedError':
+      case 'PermissionDeniedError':
+        return 'Permission denied. Please allow camera and microphone access in your browser settings.';
+      case 'NotFoundError':
+      case 'DevicesNotFoundError':
+        return 'No camera or microphone found. Connect a device and try again.';
+      case 'OverconstrainedError':
+      case 'ConstraintNotSatisfiedError':
+        return 'Requested media constraints are not supported by your device.';
+      case 'SecurityError':
+        return 'Access blocked by browser security policy. Use HTTPS or http://localhost.';
+      default:
+        return err?.message ?? 'Failed to access camera/microphone.';
+    }
   }
 }
