@@ -1,22 +1,27 @@
 import type { ChatMessage } from '../types';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { generateText, streamText } from 'ai';
 
-export const OPENROUTER_MODEL = 'meta-llama/llama-3.3-8b-instruct:free';
+export const VLLM_MODEL = 'Intelligent-Internet/II-Medical-8B';
 
-function getOpenRouterApiKey(): string | undefined {
-  return (
-    process.env.OPENROUTER_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY
-  );
+function getVllmConfig() {
+  return {
+    apiKey: process.env.VLLM_API_KEY || '',
+    baseURL: process.env.VLLM_BASE_URL || '',
+  };
 }
 
 function getModelName(): string {
-  return OPENROUTER_MODEL;
+  return VLLM_MODEL;
 }
 
-function getOpenRouter() {
-  const apiKey = getOpenRouterApiKey();
-  return createOpenRouter({ apiKey: apiKey ?? '' });
+function getVllm() {
+  const config = getVllmConfig();
+  return createOpenAICompatible({
+    name: 'vllm',
+    apiKey: config.apiKey,
+    baseURL: config.baseURL,
+  });
 }
 
 function buildPrompt(messages: Array<ChatMessage>): string {
@@ -46,7 +51,8 @@ function postprocess(text: string): string {
 }
 
 export function isAiConfigured(): boolean {
-  return Boolean(getOpenRouterApiKey());
+  const config = getVllmConfig();
+  return Boolean(config.apiKey && config.baseURL);
 }
 
 export async function generateAiReply(
@@ -54,15 +60,18 @@ export async function generateAiReply(
   opts?: { signal?: AbortSignal },
 ): Promise<string> {
   if (!isAiConfigured()) {
-    return 'AI is not configured. Set OPENROUTER_API_KEY to enable advice.';
+    return 'AI is not configured. Set VLLM_API_KEY and VLLM_BASE_URL to enable advice.';
   }
 
-  const openrouter = getOpenRouter();
   const modelName = getModelName();
   const prompt = buildPrompt(messages);
+
   try {
+    const vllm = getVllm();
+    const model: any = vllm(modelName);
+
     const { text } = await generateText({
-      model: openrouter.chat(modelName),
+      model,
       prompt,
       temperature: 0.7,
       maxOutputTokens: 256,
@@ -71,7 +80,7 @@ export async function generateAiReply(
     return postprocess(text);
   } catch (e) {
     try {
-      console.log('[OpenRouter] generateText error', String(e));
+      console.log('[VLLM] generateText error', String(e));
     } catch {}
     return 'Unable to reach AI service right now. Please try again.';
   }
@@ -93,19 +102,20 @@ export async function generateAiReplyStream(
       opts.onLog?.(line);
     } catch {}
     try {
-      console.log('[OpenRouter][UI]', line);
+      console.log('[VLLM][UI]', line);
     } catch {}
   };
 
   if (!isAiConfigured()) {
-    log('OpenRouter API key missing. Set OPENROUTER_API_KEY.');
+    const errorMsg =
+      'vllm API key missing. Set VLLM_API_KEY and VLLM_BASE_URL.';
+    log(errorMsg);
     try {
-      opts.onError?.('OpenRouter API key missing.');
+      opts.onError?.(errorMsg);
     } catch {}
     return Promise.resolve();
   }
 
-  const openrouter = getOpenRouter();
   const modelName = getModelName();
   const prompt = buildPrompt(messages);
   const parts: Array<string> = [];
@@ -116,8 +126,12 @@ export async function generateAiReplyStream(
       opts.onStart?.();
     } catch {}
     log(`Starting stream with model: ${modelName}`);
+
+    const vllm = getVllm();
+    const model: any = vllm(modelName);
+
     result = streamText({
-      model: openrouter.chat(modelName),
+      model,
       prompt,
       temperature: 0.7,
       maxOutputTokens: 256,
