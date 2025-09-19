@@ -1,11 +1,10 @@
 import { useKeyboard } from '@opentui/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { AppState, ScreenKey, UrgencyLevel } from './types';
 import {
   detectConnectionStatus,
   getDoctorAvailability,
 } from './services/status';
-import { loadSession, saveSession } from './services/storage';
 import {
   generateAiReply,
   generateAiReplyStream,
@@ -31,17 +30,7 @@ const initialState: AppState = {
 };
 
 export function useAppRouter() {
-  const stored = loadSession();
-  const [state, setState] = useState<AppState>(() => {
-    if (stored) {
-      return {
-        ...initialState,
-        triage: stored.triage,
-        summary: stored.summary,
-      };
-    }
-    return initialState;
-  });
+  const [state, setState] = useState<AppState>(initialState);
 
   const push = useCallback((next: ScreenKey) => {
     setState((s) => ({ ...s, stack: [...s.stack, s.screen], screen: next }));
@@ -247,13 +236,7 @@ export function useAppRouter() {
     if (key.sequence === '!') emergency();
   });
 
-  useEffect(() => {
-    saveSession({
-      lastUpdated: Date.now(),
-      triage: state.triage,
-      summary: state.summary,
-    });
-  }, [state.triage, state.summary]);
+  // Session persistence is intentionally disabled to avoid caching inputs across sessions.
 
   return {
     state,
