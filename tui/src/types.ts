@@ -8,6 +8,7 @@ export type ScreenKey =
   | 'SYMPTOMS'
   | 'PRE_TRIAGE'
   | 'QUEUE'
+  | 'SESSION_CHAT'
   | 'AI_CHAT'
   | 'PRESCRIPTION'
   | 'SUMMARY'
@@ -65,14 +66,10 @@ export interface AppState {
   doctor: DoctorAvailability;
   queuePosition: number | null;
 
+  session?: { id: string; role: 'patient' | 'doctor' };
+
   triage: TriageState;
   chat: { messages: ChatMessage[] };
   prescription: { items: PrescriptionItem[] };
-  summary: SummaryData | null;
-}
-
-export interface StoredSession {
-  lastUpdated: number;
-  triage: TriageState;
   summary: SummaryData | null;
 }

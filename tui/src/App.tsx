@@ -2,6 +2,7 @@ import { useKeyboard } from '@opentui/react';
 import { useAppRouter } from './router';
 import { Emergency } from './screens/Emergency';
 import { AIChat } from './screens/AIChat';
+import { SessionChat } from './screens/SessionChat';
 import { PreTriage } from './screens/PreTriage';
 import { Prescription } from './screens/Prescription';
 import { Queue } from './screens/Queue';
@@ -10,8 +11,8 @@ import { Symptoms, SYMPTOMS_TOTAL_STEPS } from './screens/Symptoms';
 import { Urgency } from './screens/Urgency';
 import { Welcome } from './screens/Welcome';
 
-export function App() {
-  const router = useAppRouter();
+export function App({ sessionToken }: { sessionToken?: string }) {
+  const router = useAppRouter(sessionToken);
   const { state } = router;
 
   useKeyboard((key) => {
@@ -32,7 +33,10 @@ export function App() {
           router.push('SYMPTOMS');
     } else if (state.screen === 'SYMPTOMS') {
     } else if (state.screen === 'PRE_TRIAGE') {
-      if (key.sequence === '1') router.push('QUEUE');
+      if (key.sequence === '1') {
+        if (state.session?.id) void router.joinDoctorQueue(state.session.id);
+        router.push('QUEUE');
+      }
       if (key.sequence === '2') router.push('AI_CHAT');
     } else if (state.screen === 'QUEUE') {
       if (key.sequence === '1') router.replace('AI_CHAT');
@@ -83,7 +87,10 @@ export function App() {
             urgency={state.triage.urgency}
             risk={state.triage.risk}
             answers={state.triage.answers}
-            onProceedDoctor={() => router.push('QUEUE')}
+            onProceedDoctor={() => (
+              state.session?.id && router.joinDoctorQueue(state.session.id),
+              router.push('QUEUE')
+            )}
             onProceedAI={() => router.push('AI_CHAT')}
           />
         )}
@@ -93,6 +100,9 @@ export function App() {
             position={state.queuePosition}
             onSwitchToAI={() => router.replace('AI_CHAT')}
           />
+        )}
+        {state.screen === 'SESSION_CHAT' && state.session && (
+          <SessionChat sessionId={state.session.id} role={state.session.role} />
         )}
         {state.screen === 'AI_CHAT' && (
           <AIChat

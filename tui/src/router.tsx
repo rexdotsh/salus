@@ -11,26 +11,39 @@ import {
   isAiConfigured,
 } from './services/ai';
 import { assessRisk } from './utils/risk';
+import { createConvexClient, enqueueToQueue } from './services/convex';
 
-const initialState: AppState = {
-  screen: 'WELCOME',
-  stack: [],
-  connection: detectConnectionStatus(),
-  doctor: getDoctorAvailability(),
-  queuePosition: null,
-  triage: {
-    urgency: undefined,
-    risk: undefined,
-    stepIndex: 0,
-    answers: {},
-  },
-  chat: { messages: [] },
-  prescription: { items: [] },
-  summary: null,
-};
+function makeInitialState(): AppState {
+  return {
+    screen: 'WELCOME',
+    stack: [],
+    connection: detectConnectionStatus(),
+    doctor: getDoctorAvailability(),
+    queuePosition: null,
+    triage: {
+      urgency: undefined,
+      risk: undefined,
+      stepIndex: 0,
+      answers: {},
+    },
+    chat: { messages: [] },
+    prescription: { items: [] },
+    summary: null,
+  };
+}
 
-export function useAppRouter() {
-  const [state, setState] = useState<AppState>(initialState);
+export function useAppRouter(sessionToken?: string) {
+  const [state, setState] = useState<AppState>(() => {
+    const base = makeInitialState();
+    if (sessionToken) {
+      return {
+        ...base,
+        screen: 'PRE_TRIAGE',
+        session: { id: sessionToken, role: 'patient' },
+      };
+    }
+    return base;
+  });
 
   const push = useCallback((next: ScreenKey) => {
     setState((s) => ({ ...s, stack: [...s.stack, s.screen], screen: next }));
@@ -238,6 +251,29 @@ export function useAppRouter() {
 
   // Session persistence is intentionally disabled to avoid caching inputs across sessions.
 
+  async function joinDoctorQueue(sessionId: string) {
+    const client = createConvexClient();
+    const a = state.triage.answers;
+    const urgency = (state.triage.urgency ?? 'Routine').toLowerCase() as
+      | 'routine'
+      | 'urgent'
+      | 'emergency';
+    const category = a.mainSymptom ?? 'general';
+    const language = 'en';
+    const symptoms = [
+      a.mainSymptom,
+      a.duration,
+      a.severity ? `sev${a.severity}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    await enqueueToQueue(client, {
+      sessionId,
+      triage: { category, urgency, language, symptoms },
+    });
+    setQueue(0);
+  }
+
   return {
     state,
     push,
@@ -250,5 +286,6 @@ export function useAppRouter() {
     setTriageStepIndex,
     sendMessage,
     generateSummary,
+    joinDoctorQueue,
   };
 }

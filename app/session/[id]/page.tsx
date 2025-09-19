@@ -67,6 +67,10 @@ export default function SessionPage() {
   );
   const sendServerMessage = useMutation(api.index.sendMessage);
   const setStatus = useMutation(api.index.setSessionStatus);
+  const sessionInfo = useQuery(
+    api.index.getSession,
+    sessionId ? { sessionId } : 'skip',
+  );
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -222,14 +226,35 @@ export default function SessionPage() {
                         playsInline
                       />
 
-                      {connecting && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                          <div className="text-center text-muted-foreground">
-                            <div className="size-12 border-4 border-muted-foreground border-t-primary rounded-full animate-spin mx-auto mb-3" />
-                            <p className="text-sm">Connecting...</p>
-                          </div>
-                        </div>
-                      )}
+                      {(() => {
+                        const hasPatientMessages = (serverMessages ?? []).some(
+                          (m) => m.sender === 'patient',
+                        );
+                        const role: Role = getRole();
+                        if (role === 'doctor' && hasPatientMessages) {
+                          return (
+                            <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                              <div className="text-center text-muted-foreground">
+                                <UserCircle2 className="size-16 mx-auto mb-3" />
+                                <p className="text-sm">
+                                  Patient connected via TUI (chat-only)
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (connecting) {
+                          return (
+                            <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                              <div className="text-center text-muted-foreground">
+                                <div className="size-12 border-4 border-muted-foreground border-t-primary rounded-full animate-spin mx-auto mb-3" />
+                                <p className="text-sm">Connecting...</p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
 
                       {!connecting && (
                         <div className="absolute inset-0 flex items-center justify-center bg-muted">
