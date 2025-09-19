@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Fragment, useEffect } from 'react';
+import { useState, Fragment, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
@@ -44,7 +44,8 @@ import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion';
 
 const AVAILABLE_MODEL = 'Intelligent-Internet/II-Medical-8B';
 
-export default function ChatPage() {
+// Extract the component that uses useSearchParams
+function ChatPageContent() {
   const [input, setInput] = useState('');
   const [model, setModel] = useState<string>(AVAILABLE_MODEL);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -241,5 +242,38 @@ export default function ChatPage() {
         </PromptInput>
       </div>
     </div>
+  );
+}
+
+function ChatPageLoading() {
+  return (
+    <div className="max-w-4xl mx-auto p-6 relative size-full h-screen">
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Waiting Room
+            </Button>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <Loader />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<ChatPageLoading />}>
+      <ChatPageContent />
+    </Suspense>
   );
 }
