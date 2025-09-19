@@ -190,6 +190,11 @@ export class PeerJsEngine implements CallEngine {
     this.local = null;
   }
 
+  // Expose RTCPeerConnection safely for read-only access (e.g., stats)
+  public getPeerConnection(): RTCPeerConnection | null {
+    return this.pc;
+  }
+
   private ensureSecureContextOrThrow(): void {
     if (typeof window === 'undefined') return;
     const host = window.location.hostname;

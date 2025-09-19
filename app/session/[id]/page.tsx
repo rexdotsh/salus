@@ -103,7 +103,7 @@ export default function SessionPage() {
           v.muted = true;
           v.play().catch(() => {});
         }
-        pcRef.current = engine.pc ?? null;
+        pcRef.current = engine.getPeerConnection();
         if (sessionId) {
           try {
             await setStatus({ sessionId, status: 'in_call' });
