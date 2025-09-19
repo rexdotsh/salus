@@ -70,7 +70,13 @@ export default function WaitingRoomPage() {
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/chat?sessionId=${sessionId}`)}
+            >
+              Open AI Chat
+            </Button>
             <Button onClick={() => router.push(`/session/${sessionId}`)}>
               Go to call
             </Button>
