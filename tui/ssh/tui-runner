@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 1) Resolve session id from SSH_ORIGINAL_COMMAND or env vars
+orig_cmd=${SSH_ORIGINAL_COMMAND-}
+session_id=${TUI_SESSION-}
+if [[ -z "${session_id}" ]]; then
+  session_id=${SESSION_ID-}
+fi
+if [[ -z "${session_id}" && -n "${orig_cmd}" ]]; then
+  session_id="${orig_cmd}"
+fi
+
+# 2) Ensure TERM is reasonable for TUI rendering
+export TERM=${TERM:-xterm-256color}
+export COLORTERM=${COLORTERM:-}
+
+# 3) Respect overrides for working dir and command
+TUI_CWD=${TUI_CWD:-/app}
+TUI_CMD=${TUI_CMD:-"bun run dist/index.js"}
+
+cd "${TUI_CWD}"
+
+# 4) Exec the TUI app via Bun, passing -t only if provided
+if [[ -n "${session_id}" ]]; then
+  exec bash -lc "${TUI_CMD} -t '${session_id}'"
+else
+  exec bash -lc "${TUI_CMD}"
+fi
+
+

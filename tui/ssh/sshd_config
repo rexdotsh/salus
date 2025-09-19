@@ -1,0 +1,35 @@
+Port 22
+ListenAddress 0.0.0.0
+Protocol 2
+
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+PermitRootLogin no
+PasswordAuthentication yes
+PermitEmptyPasswords yes
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PubkeyAuthentication no
+
+PermitTTY yes
+X11Forwarding no
+AllowTcpForwarding no
+AllowAgentForwarding no
+PermitTunnel no
+GatewayPorts no
+UseDNS no
+
+AcceptEnv TERM COLORTERM SESSION_ID TUI_SESSION TUI_CMD TUI_CWD
+
+ClientAliveInterval 60
+ClientAliveCountMax 3
+LoginGraceTime 20
+MaxSessions 20
+
+UsePAM no
+
+ForceCommand /usr/local/bin/tui-runner
+
+

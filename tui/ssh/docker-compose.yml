@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  tui-ssh:
+    build:
+      context: ..
+      dockerfile: ssh/Dockerfile
+    container_name: tui-ssh
+    restart: unless-stopped
+    ports:
+      - "22:22"
+    environment:
+      - TUI_CWD=/app
+      - TUI_CMD=bun run start
+    healthcheck:
+      test: ["CMD", "bash", "-c", "sshd -T >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+
